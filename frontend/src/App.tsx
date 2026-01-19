@@ -1,35 +1,60 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import "./App.css";
+import {
+  BrowserRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+} from "react-router-dom";
+import "../src/index.css";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import ForgetPassword from "./pages/ForgetPassword";
+import Sidebar from "./components/layout/Sidebar";
+import Home from "./pages/Home";
+import Ami from "./pages/Ami";
+import Document from "./pages/Document";
+import Result from "./pages/Result";
+import Dashboard from "./pages/Dashboard";
+import Parametre from "./pages/Parametre";
+import Quiz from "./pages/Quiz";
+import QuizAuto from "./pages/QuizAuto";
 
 function App() {
-  const [count, setCount] = useState(0)
-
+  const Layout = () => {
+    return (
+      <div className="AppHeader">
+        <div className="AppHeaderLeft">
+          <Sidebar />
+        </div>
+        <div className="AppHeaderRight">
+          <Outlet />
+        </div>
+      </div>
+    );
+  };
   return (
     <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Navigate to="/connexion" replace />} />
+          <Route path="/connexion" element={<Login />} />
+          <Route path="/inscription" element={<Register />} />
+          <Route path="/mot-de-passe-oublie" element={<ForgetPassword />} />
+          <Route path="/home" element={<Layout />}>
+            <Route index element={<Home />} />
+            <Route path="quiz/:theme" element={<Quiz />} />
+            <Route path="quiz/autoIA" element={<QuizAuto />} />
+            <Route path="ami" element={<Ami />} />
+            <Route path="document" element={<Document />} />
+            <Route path="result" element={<Result />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="parametre" element={<Parametre />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
     </>
-  )
+  );
 }
 
-export default App
+export default App;

@@ -1,0 +1,131 @@
+.QuizHeader {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100%;
+  position: relative;
+}
+.QuizHeaderBtn {
+  position: absolute;
+  top: 40px;
+  left: 50px;
+}
+.QuizHeaderTitle {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+}
+.QuizHeaderTitle img {
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  border: 5px solid #79ebf1;
+}
+.QuizWord {
+  margin-top: 35px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+}
+.QuizWord h1 {
+  clip-path: polygon(
+    0% 50%,
+    /* Pointe gauche - milieu */ 5% 0%,
+    /* Pointe gauche - haut */ 5% 0%,
+    /* Début du rectangle */ 100% 0%,
+    /* Haut droit */ 100% 100%,
+    /* Bas droit */ 5% 100%,
+    /* Bas gauche */ 5% 100%,
+    /* Pointe gauche - bas */ 0% 50% /* Retour à la pointe */
+  );
+  padding: 10px 100px 10px 120px;
+  border: 2px solid #79ebf1;
+  border-radius: 10px;
+  background: linear-gradient(
+    135deg,
+    rgba(121, 235, 241, 0.1),
+    rgba(121, 235, 241, 0.05)
+  );
+}
+.QuizWord img {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  border: 5px solid #79ebf1;
+}
+.QuizHeaderTitle h1 {
+  font-size: 40px;
+  font-weight: bold;
+  text-align: center;
+}
+.QuizHeaderTitle h1 span {
+  color: #79ebf1;
+}
+.HeaderQuizTitle h1 {
+  font-size: 30px;
+  font-weight: bold;
+  text-align: center;
+}
+.HeaderQuiz {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+.HeaderQuizOptionBtn {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: 1fr !important;
+  margin: auto;
+  gap: 30px;
+}
+.Quizbtn.choice {
+  background-color: #2196f3;
+}
+.Quizbtn.accept {
+  background-color: #4caf50 !important;
+}
+.Quizbtn.decline {
+  background-color: #f44336 !important;
+}
+.Quizbtn.decline:hover {
+  background-color: #d32f2f;
+}
+.Quizbtn.accept:hover {
+  background-color: #388e3c;
+}
+
+.Quizbtn.choice:hover {
+  background-color: #388e3c;
+}
+.QuizEnd {
+  display: flex;
+  flex-direction: column;
+}
+.ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+.rankingitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rankingitem img {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 5px solid #79ebf1;
+}
+.RankingBtn {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  gap: 20px;
+}

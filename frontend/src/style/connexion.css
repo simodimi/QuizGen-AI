@@ -1,0 +1,77 @@
+.headerLogin {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  justify-content: center;
+  align-items: center;
+}
+.MainLogin {
+  width: 700px;
+  height: auto;
+  border-radius: 10px;
+  padding: 0 60px;
+  background-color: #79ebf1;
+}
+.TitleLogin {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.TitleLogin img {
+  width: 250px;
+  height: 150px;
+}
+.MainLogin form input {
+  display: flex;
+  margin: 10px auto;
+  width: 100%;
+  height: 60px;
+  border: none;
+  border-radius: 5px;
+}
+.MainLogin form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 100%;
+}
+.LoginConnect {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+#smserror {
+  text-align: center;
+  padding: 5px 0;
+}
+.LoginLink {
+  text-align: center;
+  padding: 20px 0;
+}
+.LoginShowPassword {
+  position: relative;
+  display: flex;
+}
+.LoginShowPassword span {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translate(0, -50%);
+  cursor: pointer;
+}
+.LoginAnswer input {
+  background-color: white;
+  padding: 0 10px;
+}
+.MenuReset {
+  margin: 30px 0;
+  position: relative;
+}
+.btnSelect {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+}

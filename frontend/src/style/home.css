@@ -1,0 +1,151 @@
+.SiderbarHeaderRespo {
+  display: none;
+}
+.SiderbarHeaderNormal {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100vh;
+  width: 100%;
+}
+.SiderbarHeaderTop {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.SiderbarTitle {
+  width: 100%;
+}
+.SiderbarTitle img {
+  width: 40px;
+  height: 40px;
+}
+.SiderbarTitle.siderbaractive {
+  background-color: #6bb7bb;
+  border-radius: 10px;
+}
+.SiderbarTitle:hover {
+  background-color: #6bb7bb;
+  border-radius: 10px;
+}
+.SiderbarIcone {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  gap: 10px;
+  margin-left: 50%;
+  transform: translateX(-50%);
+  cursor: pointer;
+  position: relative;
+}
+.SiderbarIcone span {
+  position: absolute;
+  right: -10px;
+  top: 5px;
+  border-radius: 50%;
+  background-color: red;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+@media screen and (max-width: 1200px) {
+  .SiderbarHeaderNormal {
+    display: none;
+  }
+  .SiderbarHeaderRespo {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100vh;
+    width: 100%;
+  }
+  .SiderbarIcone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 0;
+    gap: 10px;
+    margin-left: 50%;
+    transform: translateX(-50%);
+    cursor: pointer;
+    position: relative;
+  }
+  .SiderbarIcone p {
+    position: absolute;
+    font-size: 12px;
+    top: -5px;
+    display: none;
+    color: white;
+  }
+  .SiderbarIcone:hover p {
+    display: block;
+    animation: dimitri 0.5s linear;
+  }
+  @keyframes dimitri {
+    0% {
+      top: 5px;
+    }
+    100% {
+      top: -5px;
+    }
+  }
+}
+.HomeHeader {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  height: 100vh;
+  width: 100%;
+  position: relative;
+}
+.HomeHeaderVideo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  z-index: 1;
+}
+.HomeHeaderVideo video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.HomeItems {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 50px;
+  width: auto;
+  padding: 0 50px;
+  z-index: 2;
+}
+.HomeItems a {
+  text-decoration: none;
+  color: white;
+  border-radius: 10px;
+  padding: 25px 60px;
+  background-color: green;
+  text-align: center;
+  font-weight: bold;
+  transition: 0.5s ease-in-out;
+  cursor: pointer;
+  width: 300px;
+}
+.HomeItems a:hover {
+  transform: scale(1.1);
+  background-color: #79ebf1;
+}
+.HomeItems a:last-child {
+  grid-column: 1 / span 2;
+  justify-self: center;
+  width: 650px;
+  background-color: blue;
+}
