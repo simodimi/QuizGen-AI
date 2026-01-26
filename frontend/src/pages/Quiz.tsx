@@ -12,19 +12,24 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 
+//typeof quizDatabase recupère le type de l'objet quizDatabase
+//keyof typeof quizDatabase union de toutes les cles de quizDatabase(theme)
+//number extrait une question par theme à la fois
+//QuizQuestion est le type d'une question individuelle
 type QuizQuestion = (typeof quizDatabase)[keyof typeof quizDatabase][number];
-
 const shuffleOptions = (question: QuizQuestion): QuizQuestion => {
+  //on sauvergarde l'index de la bonne option après le mélange
   const optionsWithIndex = question.options.map((option, index) => ({
     option,
     index,
   }));
-
+  //on mélange les options accompagnées de leur index
   const shuffled = [...optionsWithIndex].sort(() => Math.random() - 0.5);
-
+  //on extrait les options mélangées
   const newOptions = shuffled.map((o) => o.option);
+  //trouver la position de la bonne option
   const newCorrectAnswer = shuffled.findIndex(
-    (o) => o.index === question.correctAnswer
+    (o) => o.index === question.correctAnswer,
   );
 
   return {
@@ -67,14 +72,14 @@ const Quiz = () => {
       date: new Date().toLocaleDateString(),
       photo: avatar || a1,
     };
-
+    //stockage des scores dans le localStorage avec la cle "quizRanking"
     const stored = localStorage.getItem("quizRanking");
+    //RANKING est soit un tableau de ScoreEntry soit vide
     const ranking: ScoreEntry[] = stored ? JSON.parse(stored) : [];
-
+    //ajout du nouveau score au tableau
     ranking.push(newEntry);
-
     ranking.sort((a, b) => b.score - a.score);
-
+    //mise à jour du localStorage
     localStorage.setItem("quizRanking", JSON.stringify(ranking));
   };
 
@@ -104,22 +109,27 @@ const Quiz = () => {
   useEffect(() => {
     handleselectAvatar();
   }, []);
+  //fonction pour commencer le quiz
   const handlestart = () => {
     setstartquiz(false);
   };
   //function pour melanger les questions par theme
+  //la fonction prend n'importe quel type d'objet et le transforme en tableau
+  //:T[] retourne un tableau de type T
   const mixer = <T,>(array: T[]): T[] => {
     return [...array].sort(() => Math.random() - 0.5);
   };
   //fonction pour avoir 10questions
   const takeQuestion = <T,>(array: T[], count: number = 10): T[] => {
+    //prends les 10 premieres questions
     return mixer(array).slice(0, count);
   };
   //aleatoire les reponses
   useEffect(() => {
     if (questions.length > 0) {
+      //sur les 10 questions choisies ,melanger les ainsi que les options
       const selectedQuestions = takeQuestion(questions, 10).map((q) =>
-        shuffleOptions(q)
+        shuffleOptions(q),
       );
       setQuizQuestions(selectedQuestions);
     }
@@ -144,62 +154,17 @@ const Quiz = () => {
       setprofil(false);
     }
   }, [etape, startquiz]);
-  /* const handleSelect = (option: number) => {
-    if (selectoption || quizFinished) {
-      return;
-    }
-    playSound(zik1);
-    setselectoption(option);
-    if (option === quizQuestions[current].correctAnswer) {
-      playSound(zik3);
-      setcorrectOption(false);
-      setTimeout(() => {
-        setcurrent(current + 1);
-        setselectoption(null);
-        if (isLastQuestion) {
-          const score = finalScore + 1;
-          setFinalScore(score);
-          saveScore(score);
-           const stored = localStorage.getItem("quizRanking");
-  if (stored) setRanking(JSON.parse(stored));
-          setquizFinished(true);
-        } else {
-          setFinalScore(finalScore + 1);
-        }
-      }, 2000);
-    } else {
-      setprofil(true);
-      setmessage("joueur dimitri dommage.");
-      playSound(zik2);
-      setcorrectOption(true);
-      setTimeout(() => {
-        setcurrent(0);
-        setselectoption(null);
-        setcorrectOption(false);
-        setQuizQuestions(takeQuestion(questions, 10).map(shuffleOptions));
-        setprofil(false);
-        setquizFinished(true);
-        saveScore(finalScore);
-      }, 2000);
-      setFinalScore(finalScore);
-    }
-  };*/
   const handleSelect = (option: number) => {
     if (selectoption || quizFinished) return;
-
     playSound(zik1);
     setselectoption(option);
-
     const currentQuestion = quizQuestions[current];
-
     if (option === currentQuestion.correctAnswer) {
       // Bonne réponse
       playSound(zik3);
       setcorrectOption(false);
-
       setTimeout(() => {
         const nextScore = finalScore + 1;
-
         if (isLastQuestion) {
           //  (victoire)
           setprofil(true);
@@ -238,7 +203,6 @@ const Quiz = () => {
       }, 2000);
     }
   };
-
   useEffect(() => {
     if (quizFinished) {
       const stored = localStorage.getItem("quizRanking");
@@ -305,13 +269,16 @@ const Quiz = () => {
               </div>
               <div className="HeaderQuizOptionBtn">
                 {quizQuestions[current].options.map((p, index) => {
+                  //si l'index===selectoption alors isSelected=true
                   const isSelected = index === selectoption;
                   const isCorrect =
                     index === quizQuestions[current].correctAnswer;
                   let className = "Quizbtn choice";
                   if (isSelected) {
+                    //si isCorrect true alors on ajoute la class accept
                     className += isCorrect ? " accept" : " decline";
                   } else if (isCorrect && correctOption) {
+                    //si l'user a raté on affiche la bonne reponse
                     className += " accept";
                   }
                   return (
