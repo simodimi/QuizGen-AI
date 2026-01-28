@@ -19,6 +19,16 @@ import A18 from "../assets/avatar/A18.jpg";
 import A19 from "../assets/avatar/A19.jpg";
 import A20 from "../assets/avatar/A20.jpg";
 
+import B1 from "../assets/para/arbre.jpg";
+import B2 from "../assets/para/bateau.jpg";
+import B3 from "../assets/para/board.jpeg";
+import B4 from "../assets/para/cascade.jpg";
+import B5 from "../assets/para/galaxie.jpeg";
+import B6 from "../assets/para/mountains.jpg";
+import B7 from "../assets/para/neige.jpg";
+import B8 from "../assets/para/pink.jpeg";
+import B9 from "../assets/para/water.jpg";
+
 export interface AvatarType {
   id: number;
   avatar: string;
@@ -32,6 +42,23 @@ export interface QuizQuestion {
 export interface Quiztheme {
   [theme: string]: QuizQuestion[];
 }
+export interface BackgroundType {
+  id: number;
+  background: string;
+}
+export interface Police {
+  id: string;
+  police: string;
+  name: string;
+}
+export const Police: Police[] = [
+  { id: "1", police: "Roboto", name: "Roboto" },
+  { id: "2", police: "Lora", name: "Lora" },
+  { id: "3", police: "Montserrat", name: "Montserrat" },
+  { id: "4", police: "Pacifico", name: "Pacifico" },
+  { id: "5", police: "Courier New", name: "Courier New" },
+];
+
 export const Avatar: AvatarType[] = [
   { id: 1, avatar: A1 },
   { id: 2, avatar: A2 },
@@ -54,6 +81,18 @@ export const Avatar: AvatarType[] = [
   { id: 19, avatar: A19 },
   { id: 20, avatar: A20 },
 ];
+export const Background: BackgroundType[] = [
+  { id: 1, background: B1 },
+  { id: 2, background: B2 },
+  { id: 3, background: B3 },
+  { id: 4, background: B4 },
+  { id: 5, background: B5 },
+  { id: 6, background: B6 },
+  { id: 7, background: B7 },
+  { id: 8, background: B8 },
+  { id: 9, background: B9 },
+];
+
 export const quizDatabase: Quiztheme = {
   histoire: [
     {

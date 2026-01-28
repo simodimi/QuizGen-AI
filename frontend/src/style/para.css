@@ -1,0 +1,262 @@
+.ParaConfig {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  gap: 10px;
+  width: 700px;
+}
+.ParaConfig p {
+  background-color: aqua;
+  padding: 15px 0;
+  border-radius: 10px;
+  width: 100%;
+  cursor: pointer;
+}
+.ParaConfig p:hover {
+  background-color: #79ebf1;
+}
+.ParaConfigProfil {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 700px;
+}
+.headerChangeProfil {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.paraValid {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  background-color: green;
+  border-radius: 10px;
+  padding: 10px;
+}
+.paraValid .btn.accept {
+  background-color: green;
+}
+.headerChangeProfil p {
+  background-color: #5b6dd1;
+  padding: 15px 0;
+  border-radius: 10px;
+  width: 100%;
+  text-align: center;
+  margin-bottom: 10px;
+  cursor: default;
+  position: relative;
+}
+.headerChangeProfil p span {
+  position: absolute;
+  display: flex;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+}
+.headerChangeProfil p span img {
+  width: 40px;
+  height: 40px;
+  border: none;
+  cursor: pointer;
+}
+.changeProfilPicture {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  transition:
+    max-height 0.6s ease,
+    opacity 0.6s ease,
+    transform 0.6s ease;
+}
+.changeProfilPicture.close {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-5px);
+  pointer-events: none;
+}
+
+/* ouvert */
+.changeProfilPicture.open {
+  height: fit-content; /* assez grand pour le contenu */
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.visualPicture .plus {
+  border: none;
+  position: absolute;
+  top: 50%;
+  right: 50%;
+  transform: translate(50%, -50%);
+  width: 50px;
+  height: 50px;
+  z-index: -2;
+}
+.visualPicture {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  gap: 10px;
+  border-radius: 50%;
+  border: 2px solid #79ebf1;
+  cursor: pointer;
+}
+.visualPicture .realpicture {
+  width: 150px;
+  height: 150px;
+  object-fit: fill;
+  cursor: pointer;
+  border: none;
+  z-index: 2;
+}
+.pictureParabtn {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+.ProfilPassword {
+  display: flex;
+  position: relative;
+  width: 400px;
+  justify-content: center;
+  margin: auto;
+}
+.ProfilPassword .paraEyePass img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  background-color: tomato;
+  border: none;
+}
+.paraEyePass {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+#textpicture {
+  width: 400px;
+  height: 50px;
+  border-radius: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  margin: auto;
+  text-align: center;
+  border: 2px solid #79ebf1;
+  outline: none;
+}
+#textpictures {
+  width: 100%;
+  height: 50px;
+  border-radius: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  margin: auto;
+  text-align: center;
+  border: 2px solid #79ebf1;
+  outline: none;
+}
+.OptionsPass {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+}
+.OptionsCase {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.OptionsCase span {
+  width: 180px;
+}
+.OptionsCheck {
+  width: 100%;
+}
+.ParaConfigProfil .selectParabg img,
+.ParaConfigProfil .selectParaAvatar img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border: 2px solid #79ebf1;
+  cursor: pointer;
+  transition: 0.3s ease-in-out;
+}
+.ParaConfigProfil .selectParabg img:hover,
+.ParaConfigProfil .selectParaAvatar img:hover {
+  transform: scale(1.6);
+}
+.selectParabg {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin: 20px 0 10px 0;
+}
+.selectParaAvatar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 20px;
+  width: 100%;
+  padding: 0 20px;
+  margin: 20px 0 10px 0;
+}
+.optiondialog {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin: auto;
+}
+.changeProfilPicture ul {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 10px;
+  list-style: none;
+}
+.changeProfilPicture ul li {
+  display: flex;
+  align-items: center;
+  text-align: justify;
+  list-style: none;
+  gap: 10px;
+}
+.changeProfilPicture ul li::before {
+  content: "🎯";
+  color: #79ebf1;
+  font-weight: bold;
+}
+.selectParapolice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 0;
+}
+.selectParapolice .policeselect {
+  border: 2px solid #79ebf1;
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.policeselect.active {
+  background-color: #79ebf1;
+}
+.selectParapolice .policeselect:hover {
+  background-color: #79ebf1;
+}
+.visualPictures {
+  display: flex;
+  margin: 80px 0;
+}

@@ -3,9 +3,10 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  min-height: 100%;
   width: 100%;
   position: relative;
+  padding: 10px 0;
 }
 .QuizHeaderBtn {
   position: absolute;
