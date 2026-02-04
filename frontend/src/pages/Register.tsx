@@ -4,7 +4,12 @@ import Button from "../components/ui/Button";
 import eye from "../assets/icone/ouvert.png";
 import eyeClose from "../assets/icone/fermé.png";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import connect from "../services/Util";
 const Register = () => {
+  interface AxiosError {
+    response?: { data?: { message?: string } };
+  }
   interface FormData {
     userName: string;
     userEmail: string;
@@ -55,7 +60,7 @@ const Register = () => {
     setshoweye1(newItems);
     setpasstype1(newItems ? "text" : "password");
   };
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (formdata.userPassword !== formdata.userPasswordAgain) {
       seterrorsms("Les mots de passe ne correspondent pas.");
@@ -90,21 +95,34 @@ const Register = () => {
       seterrorsms("Le mot de passe ne respecte pas les critères.");
       sethideerrorsms(true);
     }
-    navigate("/home");
-    console.log({
-      userName: formdata.userName,
-      userEmail: formdata.userEmail,
-      userPassword: formdata.userPassword,
-      userPasswordAgain: formdata.userPasswordAgain,
-    });
-    setformdata({
-      userName: "",
-      userEmail: "",
-      userPassword: "",
-      userPasswordAgain: "",
-    });
-    sethideerrorsms(false);
-    sethidecheckpassword(false);
+    try {
+      const res = await connect.post("api/auth/register", formdata);
+      if (res.status === 201) {
+        toast.success(
+          `Validez votre inscription par mail ${formdata.userName}`,
+        );
+        navigate("/wait");
+        setformdata({
+          userName: "",
+          userEmail: "",
+          userPassword: "",
+          userPasswordAgain: "",
+        });
+        sethidecheckpassword(false);
+        sethideerrorsms(false);
+      }
+    } catch (error) {
+      const err = error as AxiosError;
+      if (err.response) {
+        seterrorsms(
+          err.response?.data?.message || "erreur lors de l'inscription",
+        );
+        sethideerrorsms(true);
+        toast.error(
+          err.response?.data?.message || "erreur lors de l'inscription",
+        );
+      }
+    }
   };
   const checkpassword = (password: PasswordRule): boolean => {
     const pass = formdata.userPassword;

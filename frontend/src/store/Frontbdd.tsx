@@ -51,6 +51,22 @@ export interface Police {
   police: string;
   name: string;
 }
+export interface Friends {
+  id: number;
+  name: string;
+  photo: string;
+}
+export const Friends: Friends[] = [
+  { id: 1, name: "Dimitri", photo: A1 },
+  { id: 2, name: "Lucas", photo: A2 },
+  { id: 3, name: "Paul", photo: A3 },
+  { id: 4, name: "Pierre", photo: A4 },
+  { id: 5, name: "Maxime", photo: A5 },
+  { id: 6, name: "Mathieu", photo: A6 },
+  { id: 7, name: "Nicolas", photo: A7 },
+  { id: 8, name: "Nathan", photo: A8 },
+];
+
 export const Police: Police[] = [
   { id: "1", police: "Roboto", name: "Roboto" },
   { id: "2", police: "Lora", name: "Lora" },

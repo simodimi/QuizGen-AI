@@ -1,0 +1,236 @@
+.Optionsfile {
+  width: 100%;
+  text-align: center;
+  padding: 15px 0;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.OptionsDoc {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.OptionsDocs {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+.Optionsfile p {
+  background-color: aqua;
+  padding: 15px 0;
+  border-radius: 10px;
+  width: 100%;
+  cursor: pointer;
+}
+.Optionsfiles {
+  width: 100%;
+  display: flex;
+
+  position: relative;
+}
+.Optionsfiles span {
+  background-color: #5b6dd1;
+  padding: 15px 0;
+  border-radius: 10px;
+  width: 100%;
+  cursor: pointer;
+  position: relative;
+}
+.Optionsfiles img {
+  position: absolute;
+  right: -60px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.Optionsfiles img:hover {
+  background-color: tomato;
+  border-radius: 10px;
+}
+
+.opendoc .MuiDialog-paper {
+  width: 90%;
+  max-width: 1000px;
+  height: 85vh;
+  max-height: 800px;
+  margin: 20px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  background-color: #79ebf1;
+}
+
+/* Style du contenu de la boîte de dialogue */
+.opendoc .MuiDialogContent-root {
+  padding: 0;
+  height: calc(100% - 24px);
+  background-color: #79ebf1;
+  overflow: hidden;
+}
+
+.opendoc .MuiDialogContentText-root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Style de l'iframe */
+.opendoc iframe {
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  background-color: white;
+}
+
+/* Effet de chargement */
+.opendoc iframe:not([src]) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .opendoc .MuiDialog-paper {
+    width: 95%;
+    height: 70vh;
+    margin: 10px;
+  }
+
+  .opendoc .MuiDialogContentText-root {
+    padding: 10px;
+  }
+
+  .opendoc iframe {
+    min-height: 300px;
+  }
+}
+
+@media (max-width: 480px) {
+  .opendoc .MuiDialog-paper {
+    width: 100%;
+    height: 80vh;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .opendoc iframe {
+    border-radius: 8px;
+  }
+}
+
+/* Animation d'ouverture */
+@keyframes dialogOpen {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.opendoc .MuiDialog-paper {
+  animation: dialogOpen 0.3s ease-out;
+}
+.resulticon {
+  position: relative;
+}
+
+.resulticon img {
+  position: absolute;
+  left: -60px;
+  top: 0;
+  transform: translateY(-75%);
+  width: 120px;
+  height: 120px;
+}
+.resulticon span {
+  position: absolute;
+  left: 0%;
+  top: 50%;
+  transform: translate(-50%, -45%);
+  width: 120px;
+  height: 120px;
+  font-weight: 900;
+  font-size: 30px;
+  color: honeydew;
+}
+sup {
+  margin-left: -8px;
+}
+.scoreResult {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.classementResult {
+  background-color: aqua;
+  width: clamp(300px, 50%, 500px);
+  padding: 5px 10px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.numberResult {
+  width: 40px; /* largeur fixe */
+  font-weight: 800;
+  color: #2563eb;
+  text-align: right;
+  margin-right: 8px;
+}
+
+.textResult {
+  text-align: left;
+  flex: 1;
+}
+.resultTheme {
+  background-color: #5b6dd1;
+  padding: 5px 0;
+  border-radius: 10px;
+  width: 100%;
+}
+.headerwait {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100vh;
+  gap: 20px;
+  background-color: #79ebf1;
+}
+.headerwait h1 {
+  font-size: 50px;
+}
+.headerwait p {
+  font-size: 30px;
+}

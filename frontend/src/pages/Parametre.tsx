@@ -1,6 +1,12 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  useEffect,
+} from "react";
 import Button from "../components/ui/Button";
-import a1 from "../assets/avatar/A1.jpg";
+import no from "../assets/para/no.jpg";
 import plus from "../assets/para/plus.png";
 import "../style/para.css";
 import eye from "../assets/icone/ouvert.png";
@@ -13,16 +19,31 @@ import DialogContentText from "@mui/material/DialogContentText";
 import pleure from "../assets/para/pleure.png";
 import down from "../assets/para/down.png";
 import up from "../assets/para/up.png";
+import { useAuth } from "../services/AuthContextUser";
+import connect from "../services/Util";
+import { toast } from "react-toastify";
 const Parametre = () => {
-  const [avatar, setavatar] = useState<string>(a1);
   const [picture, setpicture] = useState<string | null>(null);
   const [picturebg, setpicturebg] = useState<string | null>(null);
-  const [message, setmessage] = useState<string>("Hello dimitri,🛠️");
-  const [policetexte, setpolicetexte] = useState<string>("Roboto");
+
+  const { user, setUser, logout } = useAuth();
+  const [avatar, setavatar] = useState<string | null>(`${user?.userPhoto}`);
+  const [selectedDefaultAvatar, setSelectedDefaultAvatar] = useState<
+    string | null
+  >(null);
+  const [removeAvatar, setRemoveAvatar] = useState(false);
+  const [message] = useState<string>(`Hello ${user?.userName},🛠️`);
+  const [policetexte, setpolicetexte] = useState<string>(
+    `${user?.policeStyle}` || "Roboto",
+  );
   const [open, setOpen] = useState<boolean>(false);
   const [startquiz, setstartquiz] = useState<boolean>(true);
   const [disabling, setdisabling] = useState<boolean>(true);
   const [disabling1, setdisabling1] = useState<boolean>(true);
+  const [selectedDefaultBg, setSelectedDefaultBg] = useState<string | null>(
+    null,
+  );
+  const [removeBgPending, setRemoveBgPending] = useState(false);
   const [passtype, setpasstype] = useState<"password" | "text">("password");
   const [passtype1, setpasstype1] = useState<"password" | "text">("password");
   const [showeye, setshoweye] = useState<boolean>(false);
@@ -52,6 +73,16 @@ const Parametre = () => {
     { id: "5", open: false },
     { id: "6", open: false },
   ]);
+  //au demarrage de la page on ouvre la premiere section
+  useEffect(() => {
+    if (user) {
+      setpicture(user.userPhoto);
+      setavatar(user.userPhoto);
+      setpicturebg(user.background_image);
+      setpolicetexte(user.policeStyle);
+    }
+  }, [user]);
+
   const handleabout = (id: string) => {
     sethide((prev) =>
       prev.map((p) => (p.id === id ? { ...p, open: !p.open } : p)),
@@ -114,9 +145,10 @@ const Parametre = () => {
     setchoice5(true);
     setchoice6(true);
     setstartquiz(true);
+    setavatar(user?.userPhoto || "");
   };
   const [formdata, setformdata] = useState<Formdata>({
-    userName: "",
+    userName: user?.userName || "",
     userEmail: "",
     userPassword: "",
     userPhoto: null,
@@ -141,7 +173,8 @@ const Parametre = () => {
       const file = fichier[0];
       if (file) {
         setformdata({ ...formdata, userPhoto: file });
-        setpicture(URL.createObjectURL(file));
+        setSelectedDefaultAvatar(null);
+        setavatar(URL.createObjectURL(file));
       }
     } else {
       setformdata({ ...formdata, [name]: value });
@@ -157,41 +190,74 @@ const Parametre = () => {
     refphoto.current?.click();
   };
   const handledeletepicture = () => {
-    setpicture(null);
+    setavatar(no);
+    setformdata({ ...formdata, userPhoto: null });
+    setSelectedDefaultAvatar(null);
+    setRemoveAvatar(true);
   };
-  const handlesubmit1 = (e: ChangeEvent<HTMLFormElement>) => {
+
+  const handlesubmit1 = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const dataSave: Partial<Formdata> = {};
-    if (formdata.userPhoto) {
-      dataSave.userPhoto = formdata.userPhoto;
-    }
-    if (!disabling && formdata.userName.trim() !== "") {
-      dataSave.userName = formdata.userName;
-    }
-    if (!disabling1 && formdata.userPasswordAgain) {
-      const data = formdata.userPasswordAgain;
-      const check = {
-        longueur: data.length >= 8,
-        chiffre: /\d/.test(data),
-        majuscule: /[A-Z]/.test(data),
-        minuscule: /[a-z]/.test(data),
-        symbole: /[!@#$%^&*(),.?":{}|<>]/.test(data),
-      };
-      if (!Object.values(check).every((p) => p)) {
-        alert("Le mot de passe ne respecte pas les critères.");
-        setdisabling1(true);
-        return;
+
+    try {
+      const formData = new FormData();
+
+      // Nom
+      if (formdata.userName && formdata.userName !== user?.userName) {
+        formData.append("userName", formdata.userName.trim());
       }
-      dataSave.userPassword = formdata.userPasswordAgain;
-    }
-    if (Object.keys(dataSave).length > 0) {
-      console.log(dataSave);
-      setformdata({ ...formdata, userPasswordAgain: "", userPassword: "" });
-      setdisabling(true);
-      setdisabling1(true);
+      if (removeAvatar) {
+        formData.append("removeAvatar", "true");
+      }
+
+      // Avatar uploadé
+      if (formdata.userPhoto) {
+        formData.append("avatar", formdata.userPhoto);
+      }
+
+      // Avatar par défaut
+      if (selectedDefaultAvatar) {
+        formData.append("defaultAvatar", selectedDefaultAvatar);
+      }
+      if (formdata.userPasswordAgain) {
+        const data = formdata.userPasswordAgain;
+        const check = {
+          longueur: data.length >= 8,
+          chiffre: /\d/.test(data),
+          majuscule: /[A-Z]/.test(data),
+          minuscule: /[a-z]/.test(data),
+          symbole: /[!@#$%^&*(),.?":{}|<>]/.test(data),
+        };
+        if (!Object.values(check).every((p) => p)) {
+          alert("Le mot de passe ne respecte pas les critères.");
+          setdisabling1(true);
+          return;
+        }
+        setdisabling1(false);
+      }
+      // Mot de passe
+      if (formdata.userPassword && formdata.userPasswordAgain) {
+        formData.append("currentPassword", formdata.userPassword);
+        formData.append("newPassword", formdata.userPasswordAgain);
+      }
+
+      const response = await connect.put(`/api/users/${user?.id}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      setUser(response.data.user);
+      setavatar(response.data.user.userPhoto);
+      toast.success("Profil mis à jour");
+      setRemoveAvatar(false);
       handleback();
+      setformdata({ ...formdata, userPassword: "", userPasswordAgain: "" });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Erreur de mise à jour");
     }
   };
+
   const handlemodifypassword = () => {
     setdisabling1(true);
     setTimeout(() => {
@@ -237,7 +303,9 @@ const Parametre = () => {
     setchoice6(false);
   };
   const handledefineavatar = (p: string) => {
-    setpicture(p);
+    setavatar(p);
+    setSelectedDefaultAvatar(p);
+    setformdata({ ...formdata, userPhoto: null }); // on annule l'upload
   };
   /* step 2**************** */
   const handlechoice2 = () => {
@@ -255,15 +323,38 @@ const Parametre = () => {
     setchoice5(false);
     setchoice6(false);
   };
-  const handlesubmit2 = (e: FormEvent<HTMLFormElement>) => {
+  const handlesubmit2 = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!formdata.background_image) {
+    if (!formdata.background_image && !selectedDefaultBg && !removeBgPending) {
+      toast.error("Veuillez choisir une image");
       return;
     }
-    const data = new FormData();
-    data.append("background_image", formdata.background_image);
-    console.log("background_image", formdata.background_image);
-    handleback();
+    try {
+      const data = new FormData();
+      if (removeBgPending) {
+        data.append("removeBackground", "true");
+      }
+      if (formdata.background_image) {
+        data.append("background", formdata.background_image);
+      }
+      if (selectedDefaultBg) {
+        data.append("defaultBackground", selectedDefaultBg);
+      }
+
+      const res = await connect.put(`/api/users/${user?.id}/background`, data, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      setUser(res.data.user);
+
+      setpicturebg(res.data.background_image);
+
+      toast.success("Fond decran mis à jour");
+      handleback();
+    } catch (error) {
+      toast.error("Erreur de mise à jour");
+    }
   };
   const handleChangeMediabg = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -282,10 +373,16 @@ const Parametre = () => {
     refbg.current?.click();
   };
   const handledeletepicturebg = () => {
-    setpicturebg(null);
+    setpicturebg(null); // visuel
+    setformdata({ ...formdata, background_image: null });
+    setSelectedDefaultBg(null);
+    setRemoveBgPending(true);
   };
+
   const handledefinebg = (p: string) => {
     setpicturebg(p);
+    setSelectedDefaultBg(p);
+    setformdata({ ...formdata, background_image: null });
   };
 
   /* step 3**************** */
@@ -304,7 +401,9 @@ const Parametre = () => {
     setchoice5(false);
     setchoice6(false);
   };
-  const handledeconnect = () => {};
+  const handledeconnect = () => {
+    logout();
+  };
   /* step 4**************** */
   const handlechoice4 = () => {
     setstartquiz(false);
@@ -324,7 +423,14 @@ const Parametre = () => {
   const handleClose = () => {
     setOpen(false);
   };
-  const handleDropCount = () => {};
+  const handleDropCount = async () => {
+    try {
+      await connect.delete(`/api/users/${user?.id}`);
+      await logout();
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   /* step 5**************** */
   const handlechoice5 = () => {
@@ -345,15 +451,21 @@ const Parametre = () => {
   const handledefinepolice = (p: string) => {
     setpolicetexte(p);
   };
-  const handlesubmit3 = (e: FormEvent<HTMLFormElement>) => {
+  const handlesubmit3 = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!policetexte) {
       return;
     }
-    const data = new FormData();
-    data.append("policetexte", policetexte);
-    console.log("policetexte", policetexte);
-    handleback();
+    try {
+      await connect.put(`/api/users/${user?.id}/police`, {
+        policeStyle: policetexte,
+      });
+
+      toast.success("Police mise à jour");
+      handleback();
+    } catch (error) {
+      console.error(error);
+    }
   };
   /* step 6**************** */
   const handlechoice6 = () => {
@@ -381,7 +493,7 @@ const Parametre = () => {
         )}
         {startquiz && (
           <div className="QuizWord">
-            {picture && <img src={picture} alt="" />}
+            {<img src={picture ? picture : no} alt="" />}
             <h1>{message}</h1>
           </div>
         )}
@@ -409,13 +521,16 @@ const Parametre = () => {
               <div className="headerChangeProfil">
                 <p>Changer votre photo de profil</p>
                 <div className="changeProfilPicture">
-                  <span>cliquer pour ajouter une photo</span>
+                  <span>
+                    cliquer sur votre photo principale ou mini avatar pour
+                    ajouter une photo.
+                  </span>
                   <div className="visualPicture" onClick={handlenewpicture}>
                     <img className="plus" src={plus} alt="" />
-                    {picture && (
+                    {avatar && (
                       <img
                         className="realpicture"
-                        src={picture}
+                        src={avatar}
                         alt="photo de profil"
                       />
                     )}
@@ -622,7 +737,7 @@ const Parametre = () => {
         {choicePara4 && (
           <div className="ParaConfigProfil">
             <div className="headerChangeProfil">
-              <p>Dimitri,Voulez-vous vous supprimer votre compte ?</p>
+              <p>{user?.userName},Voulez-vous vous supprimer votre compte ?</p>
               <div className="changeProfilPicture"></div>
             </div>
             <div className="pictureParabtn">

@@ -4,7 +4,7 @@ const {
   QuizParticipant,
   QuizAnswer,
   User,
-} = require("../models");
+} = require("../models/Association");
 
 const activeQuizzes = new Map();
 

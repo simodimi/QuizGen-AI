@@ -7,7 +7,7 @@ const {
   Friend,
   Message,
   UserProgress,
-} = require("../models");
+} = require("../models/Association");
 const { Op } = require("sequelize");
 
 const getUserStats = async (req, res) => {

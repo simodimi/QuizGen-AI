@@ -1,5 +1,5 @@
 const { DataTypes } = require("sequelize");
-const sequelize = require("../config/database");
+const { sequelize } = require("../config/database");
 
 const User = sequelize.define("User", {
   id: {
@@ -31,6 +31,14 @@ const User = sequelize.define("User", {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
   },
+  avatarType: {
+    type: DataTypes.ENUM("default", "custom"),
+    defaultValue: "default",
+  },
+  avatarFileName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   last_login: {
     type: DataTypes.DATE,
     allowNull: true,
@@ -54,6 +62,10 @@ const User = sequelize.define("User", {
   isOnline: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
+  },
+  policeStyle: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
 });
 

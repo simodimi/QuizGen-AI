@@ -1,0 +1,419 @@
+.headerFriends {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+}
+.headerFriendsLeft {
+  display: flex;
+  flex-direction: column;
+  width: 299px;
+  border-right: 1px solid #79ebf1;
+  height: 100vh;
+  scrollbar-width: thin;
+  overflow-y: auto;
+}
+.headerFriendsLeft #title {
+  text-align: center;
+  font-size: 20px;
+  font-weight: bold;
+  margin: 10px 0;
+}
+.filterFriendsAccept {
+  display: flex;
+  padding: 15px;
+}
+.filterFriendsAccept input {
+  width: 100%;
+  height: 50px;
+  border-radius: 10px;
+  border: none;
+  outline: 2px solid #79ebf1;
+  padding: 0 10px;
+}
+
+.headerFriendsRight {
+  display: flex;
+  flex-direction: column;
+  width: calc(100% - 300px);
+  height: 100vh;
+  overflow-y: auto;
+}
+.UserDescribe {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  background-color: #79ebf1;
+  padding: 5px 30px;
+}
+.UserDescribeLeft {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 0;
+}
+.UserDescribeLeft img {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+}
+.UserDescribeRight {
+  display: flex;
+  cursor: pointer;
+}
+.UserDescribeSendSms {
+  position: relative;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.UserDescribeSendSms span {
+  position: absolute;
+  top: 0%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-size: 12px;
+  opacity: 0;
+  cursor: pointer;
+}
+.UserDescribeSendSms:hover span {
+  animation: defile 0.5s linear;
+  opacity: 1;
+}
+@keyframes defile {
+  0% {
+    top: 50%;
+    opacity: 1;
+  }
+  100% {
+    top: 0%;
+    opacity: 1;
+  }
+}
+.UserDescribeVisible {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0;
+}
+.UserDescribeVisible p {
+  background-color: #79ebf1;
+  padding: 15px 40px;
+  width: 100%;
+  cursor: pointer;
+}
+.UserDescribeVisible p:hover {
+  background-color: #6bb7bb;
+}
+.headerFriendsRightSearch {
+  display: flex;
+  flex-direction: column;
+  padding: 40px 0;
+}
+.HeaderFriendsWaitings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 0;
+}
+.HeaderFriendsWaiting {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  background-color: #6bb7bb;
+}
+.FriendsMainItems.active {
+  background-color: #6bb7bb;
+}
+.WaitingAcceptButton {
+  display: flex;
+  gap: 20px;
+}
+.WaitingAccept {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+.WaitingAccept img {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 5px solid #79ebf1;
+}
+.headerFriendsSend {
+  margin-top: 20px;
+}
+.headerFriendsSend input {
+  width: 50%;
+  height: 60px;
+  border-radius: 10px;
+  border: none;
+  outline: 2px solid #79ebf1;
+  padding: 0 10px;
+  margin-left: 50% !important;
+  transform: translateX(-50%);
+  margin-top: 15px;
+  margin-bottom: 15px;
+}
+.AmityReceive {
+  display: flex;
+  gap: 30px;
+}
+.FriendsMainItem {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: #79ebf1;
+  padding: 15px 0;
+}
+.FriendsMain {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  height: fit-content;
+  gap: 15px;
+  padding: 15px;
+}
+.FriendsMainItem:hover,
+.FriendsMainItems:hover {
+  background-color: #6bb7bb;
+}
+.FriendsMainItems {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background-color: #79ebf1;
+  border-radius: 10px;
+  padding: 5px;
+  cursor: pointer;
+  width: 100%;
+  justify-content: center;
+  position: relative;
+}
+.FriendsMainItems img,
+.FriendsMainItem img {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 2px solid #79ebf1;
+}
+.StatutsUser {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.UserList {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.headerSmsRight {
+  width: calc(100% - 300px);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: relative;
+}
+.headerSmsRightDescription {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  background: #79ebf1;
+  height: 80px;
+  padding: 0px 20px;
+}
+.UserDescribeSms {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+.UserDescribeSms img {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+}
+.UserDescribeSms span {
+  position: absolute;
+  right: -8px;
+  top: 0;
+}
+.SmsMain {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px 10px;
+  height: calc(100vh - 230px);
+  width: 100%;
+  overflow-y: auto;
+}
+.SmsSend {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  width: 100%;
+  height: 149px;
+  border-top: 1px solid #79ebf1;
+  box-shadow: 2px 0px 3px #79ebf1;
+}
+.SmsEmoji,
+.Smsbtn {
+  width: 15%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+.emojilist {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 0%;
+  z-index: 15;
+}
+.SmsEmoji span,
+.Smsbtn span {
+  font-size: 40px;
+  cursor: pointer;
+}
+.SmsEmoji p,
+.Smsbtn p {
+  position: absolute;
+  top: 25%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+}
+.SmsEmoji span:hover + p,
+.Smsbtn span:hover + p {
+  animation: defiles 0.5s linear;
+  opacity: 1;
+}
+@keyframes defiles {
+  0% {
+    top: 50%;
+    opacity: 0;
+  }
+  100% {
+    top: 25%;
+    opacity: 1;
+  }
+}
+.SmsTextearea {
+  width: 70%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.SmsTextearea textarea {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  padding: 10px;
+  border-left: 1px solid #79ebf1;
+  border-right: 1px solid #79ebf1;
+  outline: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.SmsHome {
+  background-color: gray;
+  width: fit-content;
+  max-width: 700px;
+  height: fit-content;
+  padding: 10px 15px;
+  border-radius: 0px 15px 15px 15px;
+  text-align: justify;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.SmsHome p {
+  width: 100%;
+  white-space: pre-wrap !important;
+  word-break: break-word;
+  margin: 0;
+}
+.SmsAway {
+  background-color: #79ebf1;
+  width: 100%;
+  max-width: 700px;
+  height: fit-content;
+  padding: 10px 15px;
+  border-radius: 15px 0px 15px 15px;
+  text-align: justify;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.SmsMainContentAway {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: end;
+}
+.SmsHome span,
+.SmsAway span {
+  display: flex;
+  justify-content: end;
+  font-size: 12px;
+  color: white;
+  font-weight: bold;
+}
+.SmsMainContent {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.FriendsMainItems span {
+  position: absolute;
+  right: 10px;
+  top: 5px;
+  background-color: #6bb7bb;
+  border-radius: 50%;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 10px;
+}
+.emojiOnly {
+  font-size: 60px;
+}
+#lauchtext {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100%;
+  font-size: 30px;
+}
+.quiz-link {
+  display: inline !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  background-color: tomato;
+  color: green;
+  cursor: pointer;
+  text-decoration: underline;
+  margin: 0 5px;
+}

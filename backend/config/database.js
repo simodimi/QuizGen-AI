@@ -22,4 +22,4 @@ sequelize
     console.log("erreur de connexion à la base de données", error);
   });
 
-module.exports = sequelize;
+module.exports = { sequelize };

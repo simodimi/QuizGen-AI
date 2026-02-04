@@ -1,4 +1,4 @@
-const { Message, User } = require("../models");
+const { Message, User } = require("../models/Association");
 const { Op } = require("sequelize");
 
 const sendMessage = async (req, res) => {

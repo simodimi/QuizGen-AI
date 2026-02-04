@@ -1,4 +1,9 @@
-const { QuizAnswer, Question, QuizParticipant, Quiz } = require("../models");
+const {
+  QuizAnswer,
+  Question,
+  QuizParticipant,
+  Quiz,
+} = require("../models/Association");
 const { Op } = require("sequelize");
 
 const submitAnswer = async (req, res) => {

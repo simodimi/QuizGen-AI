@@ -5,6 +5,12 @@ import eye from "../assets/icone/ouvert.png";
 import eyeClose from "../assets/icone/fermé.png";
 import "../style/connexion.css";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { useAuth } from "../services/AuthContextUser";
+
+interface axiosError {
+  response?: { data?: { message?: string } };
+}
 const Login = () => {
   interface FormData {
     userEmail: string;
@@ -18,6 +24,7 @@ const Login = () => {
   const [passtype, setpasstype] = useState<"password" | "text">("password");
   const [showeye, setshoweye] = useState<boolean>(false);
   const [errorsms, seterrorsms] = useState<string>("");
+  const { login, user } = useAuth();
   const [hideerrorsms, sethideerrorsms] = useState<boolean>(false);
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -28,7 +35,7 @@ const Login = () => {
     setshoweye(neweye);
     setpasstype(neweye ? "text" : "password");
   };
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!formdata.userEmail || !formdata.userPassword) {
       seterrorsms("Veuillez remplir tous les champs.");
@@ -41,13 +48,20 @@ const Login = () => {
       sethideerrorsms(true);
       return;
     }
-    navigate("/home");
-    console.log({
-      userEmail: formdata.userEmail,
-      userPassword: formdata.userPassword,
-    });
-    setformdata({ ...formdata, userEmail: "", userPassword: "" });
-    sethideerrorsms(false);
+    try {
+      await login(formdata.userEmail, formdata.userPassword);
+      navigate("/home");
+      toast.success(`Hello ${user?.userName}`);
+      setformdata({ ...formdata, userEmail: "", userPassword: "" });
+      sethideerrorsms(false);
+    } catch (error) {
+      const err = error as axiosError;
+      if (err.response) {
+        seterrorsms(err.response?.data?.message || "erreur de connexion");
+      } else {
+        seterrorsms("Une erreur s'est produite.");
+      }
+    }
   };
   return (
     <div className="headerLogin">

@@ -3,7 +3,7 @@ const { socketAuth } = require("../middlewares/authMiddleware");
 
 const quizSocketHandler = require("./quizSocket");
 const chatSocketHandler = require("./chatSocket");
-const presenceSocketHandler = require("./presenceSocket");
+/*const presenceSocketHandler = require("./presenceSocket");*/
 
 function initSockets(server) {
   const io = new Server(server, {
@@ -21,14 +21,14 @@ function initSockets(server) {
 
   io.on("connection", (socket) => {
     console.log(
-      `👤 Nouvelle connexion Socket: ${socket.id} (user: ${socket.userId})`,
+      `Nouvelle connexion Socket: ${socket.id} (user: ${socket.userId})`,
     );
 
     // Rejoindre la room de l'utilisateur
     socket.join(`user_${socket.userId}`);
 
     // Initialiser les handlers
-    presenceSocketHandler(io, socket);
+    /*presenceSocketHandler(io, socket);*/
     quizSocketHandler(io, socket);
     chatSocketHandler(io, socket);
 

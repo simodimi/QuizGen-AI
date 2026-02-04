@@ -1,4 +1,4 @@
-const { User } = require("../models/UserModel");
+const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const Mailjet = require("node-mailjet");
@@ -21,16 +21,51 @@ const generateToken = (user) => {
     { expiresIn: "5h" },
   );
 };
-
+//liste des avatar disponible
+const avatars = [
+  "A1.jpg",
+  "A2.jpg",
+  "A3.jpg",
+  "A4.jpg",
+  "A5.jpg",
+  "A6.jpg",
+  "A7.jpg",
+  "A8.jpg",
+  "A9.jpg",
+  "A10.jpg",
+  "A11.jpg",
+  "A12.jpg",
+  "A13.jpg",
+  "A14.jpg",
+  "A15.jpg",
+  "A16.jpg",
+  "A17.jpg",
+  "A18.jpg",
+  "A19.jpg",
+  "A20.jpg",
+];
+//selection au hasard d'un avatar
+const getRandomAvatar = () => {
+  const mix = Math.floor(Math.random() * avatars.length);
+  return avatars[mix];
+};
+//fonction pour générer l'url de l'avatar
+const getAvatarUrl = (avatarFileName, req, isDefault = true) => {
+  if (isDefault) {
+    return `${req.protocol}://${req.get("host")}/public/avatars/${avatarFileName}`;
+  } else {
+    return `${req.protocol}://${req.get("host")}/uploads/avatars/${avatarFileName}`;
+  }
+};
 //inscriptionde l'user
 const createUser = async (req, res) => {
   try {
     const { userName, userEmail, userPassword } = req.body;
     const userPasswordAgain = req.body.userPasswordAgain;
+    //selection de l'avatar au hasard
+    const randomavatar = getRandomAvatar();
     //géneration d'une url pour l'image
-    const userPhoto = req.file
-      ? `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`
-      : null;
+    const userPhoto = getAvatarUrl(randomavatar, req, true);
     if (!userName || !userEmail || !userPassword || !userPasswordAgain) {
       return res
         .status(400)
@@ -58,6 +93,8 @@ const createUser = async (req, res) => {
       userEmail,
       userPassword: hashedpassword,
       userPhoto,
+      avatarType: "default", //type d'avatar(default/custom)
+      avatarFileName: randomavatar, //nom de fichier
       validationToken: token,
       isActive: false,
     });
@@ -72,12 +109,13 @@ const createUser = async (req, res) => {
            <div style="text-align: center;">
               <h1 style="margin-bottom: 10px;">Bienvenue sur QuizGen-IA</h1>
               <img src="http://localhost:5000/public/logo.png" alt="Logo" style="width: 120px; height: 90px;" />
-              </div>
-              
-          <p>Bonjour ${newUser.userName}, votre compte a été crée avec succès.</p>
+               <p>Bonjour ${newUser.userName}, votre compte a été crée avec succès.</p>
           <p>Veuillez confirmer votre compte en cliquant sur le lien suivant : <a href="http://localhost:5173/confirmation/${newUser.validationToken}">Confirmer mon compte</a></p>
           <p> à bientot sur QuizGen-IA !</p>
-          <img src="http://localhost:5000/public/logo.png" alt="Logo" style="width: 120px; height: 90px;" />
+          <img src="${newUser.userPhoto}" alt="Votre avatar" style="width: 100px; height: 100px; border-radius: 50%;" />
+              </div>
+              
+         
           `,
         },
       ],
@@ -88,6 +126,7 @@ const createUser = async (req, res) => {
       userName: newUser.userName,
       userEmail: newUser.userEmail,
       userPhoto: newUser.userPhoto,
+      avatarType: newUser.avatarType,
       message: "utilisateur crée avec succès,veuillez confirmer votre compte",
     });
   } catch (error) {

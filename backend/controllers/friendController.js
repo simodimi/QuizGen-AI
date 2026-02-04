@@ -1,4 +1,4 @@
-const { Friend, User } = require("../models");
+const { Friend, User } = require("../models/Association");
 const { Op } = require("sequelize");
 
 const sendFriendRequest = async (req, res) => {

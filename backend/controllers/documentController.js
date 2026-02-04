@@ -1,4 +1,4 @@
-const { Document, Section, Quiz } = require("../models");
+const { Document, Section, Quiz } = require("../models/Association");
 const {
   extractTextFromFile,
   detectSections,

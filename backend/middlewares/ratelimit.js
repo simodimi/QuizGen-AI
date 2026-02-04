@@ -1,3 +1,5 @@
+const rateLimit = require("express-rate-limit");
+const { ipKeyGenerator } = require("express-rate-limit");
 // Limitation globale pour les requêtes API
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

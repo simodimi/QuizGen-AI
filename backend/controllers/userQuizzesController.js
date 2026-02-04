@@ -4,7 +4,7 @@ const {
   User,
   Document,
   Question,
-} = require("../models");
+} = require("../models/Association");
 const { Op } = require("sequelize");
 
 const getCreatedQuizzes = async (req, res) => {

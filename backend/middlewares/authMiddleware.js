@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const { User } = require("../models");
+const User = require("../models/User");
 
 const verifyToken = async (req, res, next) => {
   try {
@@ -39,10 +39,10 @@ const verifyToken = async (req, res, next) => {
     // Ajouter l'utilisateur à la requête
     req.user = {
       id: user.id,
-      username: user.userName,
-      email: user.userEmail,
-      photo: user.userPhoto,
-      status: user.statut,
+      userName: user.userName,
+      userEmail: user.userEmail,
+      userPhoto: user.userPhoto,
+      statut: user.statut,
       isOnline: user.isOnline,
     };
 

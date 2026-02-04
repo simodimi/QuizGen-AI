@@ -5,10 +5,14 @@ import img4 from "../../assets/icone/result.png";
 import img5 from "../../assets/icone/dash.png";
 import img6 from "../../assets/icone/para.png";
 import img7 from "../../assets/icone/quiz.png";
+import img8 from "../../assets/icone/sms.png";
 import "../../style/home.css";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-const Sidebar = () => {
+interface AmiProps {
+  countFriends: number;
+}
+const Sidebar = ({ countFriends }: AmiProps) => {
   const [select, setselect] = useState<string>("quiz");
   const location = useLocation();
   useEffect(() => {
@@ -18,6 +22,7 @@ const Sidebar = () => {
     if (location.pathname === "/home/result") setselect("result");
     if (location.pathname === "/home/dashboard") setselect("dash");
     if (location.pathname === "/home/parametre") setselect("para");
+    if (location.pathname === "/home/message") setselect("sms");
   }, [location.pathname]);
 
   return (
@@ -39,6 +44,20 @@ const Sidebar = () => {
           </div>
           <div
             className={`SiderbarTitle ${
+              select === "sms" ? "siderbaractive" : ""
+            }`}
+            onClick={() => setselect("sms")}
+          >
+            <Link to="/home/message">
+              <div className="SiderbarIcone">
+                <img src={img8} alt="" />
+                <p>Messages</p>
+                <span>0</span>
+              </div>
+            </Link>
+          </div>
+          <div
+            className={`SiderbarTitle ${
               select === "ami" ? "siderbaractive" : ""
             }`}
             onClick={() => setselect("ami")}
@@ -47,7 +66,7 @@ const Sidebar = () => {
               <div className="SiderbarIcone">
                 <img src={img2} alt="" />
                 <p>Ami(e)s</p>
-                <span>0</span>
+                <span>{countFriends}</span>
               </div>
             </Link>
           </div>
@@ -127,6 +146,20 @@ const Sidebar = () => {
           </div>
           <div
             className={`SiderbarTitle ${
+              select === "sms" ? "siderbaractive" : ""
+            }`}
+            onClick={() => setselect("sms")}
+          >
+            <Link to="/home/message">
+              <div className="SiderbarIcone">
+                <img src={img8} alt="" />
+                <p>Messages</p>
+                <span>0</span>
+              </div>
+            </Link>
+          </div>
+          <div
+            className={`SiderbarTitle ${
               select === "ami" ? "siderbaractive" : ""
             }`}
             onClick={() => setselect("ami")}
@@ -135,7 +168,7 @@ const Sidebar = () => {
               <div className="SiderbarIcone">
                 <img src={img2} alt="" />
                 <p>Ami(e)s</p>
-                <span>0</span>
+                <span>{countFriends}</span>
               </div>
             </Link>
           </div>

@@ -1,4 +1,4 @@
-const { Message, Friend, User } = require("../models");
+const { Message, Friend, User } = require("../models/Association");
 const { Op } = require("sequelize");
 
 module.exports = (io, socket) => {

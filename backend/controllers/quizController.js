@@ -6,10 +6,10 @@ const {
   QuizParticipant,
   User,
   Friend,
-} = require("../models");
+} = require("../models/Association");
 const { Op } = require("sequelize");
 const quizService = require("../services/quizService");
-const aiQuizService = require("../services/aiQuizService");
+const aiQuizService = require("../services/iaQuizService");
 
 const generateQuizFromDocument = async (req, res) => {
   try {
