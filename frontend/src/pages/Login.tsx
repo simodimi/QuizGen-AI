@@ -51,7 +51,6 @@ const Login = () => {
     try {
       await login(formdata.userEmail, formdata.userPassword);
       navigate("/home");
-      toast.success(`Hello ${user?.userName}`);
       setformdata({ ...formdata, userEmail: "", userPassword: "" });
       sethideerrorsms(false);
     } catch (error) {

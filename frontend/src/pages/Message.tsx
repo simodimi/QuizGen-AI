@@ -1,21 +1,42 @@
 import { useState, type ChangeEvent, useRef, useEffect } from "react";
-import { Friends } from "../store/Frontbdd";
-import img1 from "../assets/icone/ami.png";
+import { io, Socket } from "socket.io-client";
+
 import "../style/ami.css";
 import Emoji from "../components/layout/Emoji";
 import logo from "../assets/icone/logo.png";
+import connect from "../services/Util";
+import { useAuth } from "../services/AuthContextUser";
+import { toast } from "react-toastify";
 
 interface Message {
-  id: string;
+  id: number;
+  senderId: number;
+  receiverId: number;
   message: string;
+  content?: string;
   time: string;
-  isEmojiOnly?: boolean; // ? pour dire optionnel
+  isEmojiOnly?: boolean;
   timestamp: number;
+  isRead?: boolean;
+  messageType?: string;
+  createdAt?: string;
+}
+
+interface Friends {
+  id: number;
+  name: string;
+  photo?: string;
+  requestId?: number;
+  receiverId?: number;
+  isFriend?: boolean;
+  hasSentRequest?: boolean;
+  hasReceivedRequest?: boolean;
 }
 
 interface AmiProps {
   usersend: number | null;
 }
+
 const Message = ({ usersend }: AmiProps) => {
   const [open, setopen] = useState<boolean>(false);
   const [write, setwrite] = useState<string>("");
@@ -24,84 +45,507 @@ const Message = ({ usersend }: AmiProps) => {
   const [selectUser, setselectUser] = useState<number | null>(null);
   const [showUser, setshowUser] = useState<Friends | null>(null);
   const [textesearch, settextesearch] = useState<string>("");
-  const [userfilter, setuserfilter] = useState<Friends[]>(Friends);
+  const [userfilter, setuserfilter] = useState<Friends[]>([]);
+  const [friends, setfriends] = useState<Friends[]>([]);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<number[]>([]);
+  const [typingUsers, setTypingUsers] = useState<Record<number, boolean>>({});
+  const [isTyping, setIsTyping] = useState<boolean>(false);
+  const [typingTimeout, setTypingTimeout] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   const refemoji = useRef<HTMLDivElement | null>(null);
   const refslider = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const handlemoj = (e: MouseEvent) => {
-      if (refemoji.current && !refemoji.current.contains(e.target as Node)) {
-        setshowemoji(false);
-      }
-    };
-    document.addEventListener("mousedown", handlemoj);
-    return () => {
-      document.removeEventListener("mousedown", handlemoj);
-    };
-  }, []);
+  const { user } = useAuth();
+  const currentMessages = selectUser !== null ? userSms[selectUser] || [] : [];
 
-  const handleclose = () => {
-    setopen(false);
+  // Initialisation Socket.IO
+  useEffect(() => {
+    console.log("Initialisation Socket.IO...");
+
+    // Initialiser Socket.IO
+    const newSocket = io("http://localhost:5000", {
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      query: {
+        userId: user?.id?.toString(),
+      },
+    });
+
+    setSocket(newSocket);
+
+    console.log("Socket créé avec ID:", newSocket.id);
+
+    // Écouter la connexion réussie
+    newSocket.on("connect", () => {
+      console.log("Socket connecté avec ID:", newSocket.id);
+
+      // Rejoindre la room utilisateur
+      if (user?.id) {
+        newSocket.emit("join_user_room", user.id);
+        console.log(`Utilisateur ${user.id} a rejoint sa room`);
+
+        // Demander les utilisateurs en ligne
+        newSocket.emit("get_online_users");
+      }
+    });
+
+    // Écouter les nouveaux messages
+    /* newSocket.on("chat:receive", (newMessage: any) => {
+      console.log("Nouveau message reçu via Socket:", newMessage);
+
+      // Déterminer l'ID de la conversation
+      const conversationId =
+        newMessage.senderId === user?.id
+          ? newMessage.receiverId
+          : newMessage.senderId;
+
+      // Vérifier si c'est pour la conversation actuelle
+      if (conversationId === selectUser || !selectUser) {
+        // Formater le message
+        const formattedMessage = {
+          id: newMessage.id || Date.now(),
+          senderId: newMessage.senderId,
+          receiverId: newMessage.receiverId,
+          message: newMessage.content || newMessage.message,
+          time: new Date(newMessage.createdAt || Date.now()).toLocaleTimeString(
+            [],
+            {
+              hour: "2-digit",
+              minute: "2-digit",
+            },
+          ),
+          timestamp: new Date(newMessage.createdAt || Date.now()).getTime(),
+          isRead: newMessage.isRead || false,
+          isEmojiOnly: isEmojiOnly(newMessage.content || ""),
+        };
+
+        console.log(
+          "Message formaté pour conversation:",
+          conversationId,
+          formattedMessage,
+        );
+
+        // Ajouter le message à la conversation
+        setuserSms((prev) => {
+          const currentConv = prev[conversationId] || [];
+          const messageExists = currentConv.some(
+            (msg) => msg.id === formattedMessage.id,
+          );
+
+          if (messageExists) {
+            console.log("Message déjà présent, ignoré");
+            return prev;
+          }
+
+          return {
+            ...prev,
+            [conversationId]: [...currentConv, formattedMessage],
+          };
+        });
+      }
+    });*/
+    newSocket.on("chat:receive", (newMessage: any) => {
+      // 🔥 IGNORER les messages envoyés par moi-même
+      if (newMessage.senderId === user?.id) return;
+
+      const conversationId = newMessage.senderId;
+
+      const formattedMessage = {
+        id: newMessage.id,
+        senderId: newMessage.senderId,
+        receiverId: newMessage.receiverId,
+        message: newMessage.content,
+        time: new Date(newMessage.createdAt).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        timestamp: new Date(newMessage.createdAt).getTime(),
+        isRead: newMessage.isRead,
+        isEmojiOnly: isEmojiOnly(newMessage.content),
+      };
+
+      setuserSms((prev) => ({
+        ...prev,
+        [conversationId]: [...(prev[conversationId] || []), formattedMessage],
+      }));
+    });
+
+    // Écouter les messages envoyés
+    newSocket.on("chat:sent", (message: any) => {
+      console.log("Message envoyé confirmé:", message);
+
+      if (message.receiverId === selectUser) {
+        const formattedMessage = {
+          id: message.id,
+          senderId: message.senderId,
+          receiverId: message.receiverId,
+          message: message.content,
+          time: new Date(message.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          timestamp: new Date(message.createdAt).getTime(),
+          isRead: message.isRead,
+          isEmojiOnly: isEmojiOnly(message.content),
+        };
+
+        setuserSms((prev) => {
+          if (selectUser === null) return prev;
+          const currentConv = prev[selectUser] || [];
+          const messageExists = currentConv.some(
+            (msg) => msg.id === formattedMessage.id,
+          );
+
+          if (messageExists) return prev;
+
+          return {
+            ...prev,
+            [selectUser]: [...currentConv, formattedMessage],
+          };
+        });
+      }
+    });
+
+    // Indicateur de frappe
+    /* newSocket.on(
+      "typing:status",
+      ({ userId, isTyping: typing }: { userId: number; isTyping: boolean }) => {
+
+        if (userId === selectUser) {
+          setTypingUsers((prev) => ({
+            ...prev,
+            [userId]: typing,
+          }));
+        }
+      },
+    );*/
+    newSocket.on("typing:status", ({ userId, isTyping }) => {
+      setTypingUsers((prev) => ({
+        ...prev,
+        [userId]: isTyping,
+      }));
+    });
+    newSocket.on("chat:conversation_read", ({ messageIds }) => {
+      setuserSms((prev) => {
+        const updated = { ...prev };
+
+        Object.keys(updated).forEach((convId) => {
+          updated[convId] = updated[convId].map((msg) =>
+            messageIds?.includes(msg.id) ? { ...msg, isRead: true } : msg,
+          );
+        });
+
+        return updated;
+      });
+    });
+
+    // Utilisateurs en ligne
+    newSocket.on("online_users", (users: number[]) => {
+      console.log("Liste des utilisateurs en ligne:", users);
+      setOnlineUsers(users);
+    });
+
+    newSocket.on("user_online", (userId: number) => {
+      console.log(`Utilisateur ${userId} est maintenant en ligne`);
+      setOnlineUsers((prev) => {
+        if (!prev.includes(userId)) {
+          return [...prev, userId];
+        }
+        return prev;
+      });
+    });
+
+    newSocket.on("user_offline", (userId: number) => {
+      console.log(`Utilisateur ${userId} est maintenant hors ligne`);
+      setOnlineUsers((prev) => prev.filter((id) => id !== userId));
+    });
+
+    // Notifications
+    newSocket.on("chat:notification", (notification: any) => {
+      console.log("Notification reçue:", notification);
+
+      if (notification.senderId !== selectUser) {
+        // Afficher une notification
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification(`Nouveau message de ${notification.senderName}`, {
+            body: notification.preview,
+            icon: logo,
+          });
+        }
+      }
+    });
+
+    // Gestion des erreurs
+    newSocket.on("connect_error", (error) => {
+      console.error("Erreur de connexion Socket.IO:", error);
+    });
+
+    // Demander la permission pour les notifications
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    return () => {
+      console.log("Nettoyage Socket.IO");
+      if (typingTimeout) {
+        clearTimeout(typingTimeout);
+      }
+      newSocket.disconnect();
+    };
+  }, [user?.id]);
+
+  // Mettre à jour quand selectUser change
+  useEffect(() => {
+    if (socket && selectUser && user?.id) {
+      // Rejoindre la room de l'utilisateur sélectionné
+      socket.emit("join_user_room", selectUser);
+
+      // Marquer les messages comme lus
+      markMessageAsRead(selectUser);
+    }
+  }, [selectUser, socket, user?.id]);
+
+  // Fonction pour marquer les messages comme lus
+  const markMessageAsRead = async (senderId: number) => {
+    try {
+      await connect.post(`/api/messages/${senderId}/read`);
+      if (socket) {
+        socket.emit("chat:conversation_read", { senderId });
+      }
+    } catch (error) {
+      console.error("Erreur lors du marquage comme lu:", error);
+    }
   };
+
+  // Chargement des messages
+  const loadsms = async (id: number) => {
+    try {
+      const res = await connect.get(`/api/messages/conversation/${id}`);
+      console.log("Messages chargés depuis API:", res.data);
+
+      if (res.data.success) {
+        const messages = res.data.messages.map((p: any) => ({
+          id: p.id,
+          senderId: p.senderId,
+          receiverId: p.receiverId,
+          message: p.content,
+          content: p.content,
+          time: new Date(p.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          timestamp: new Date(p.createdAt).getTime(),
+          isRead: p.isRead,
+          isEmojiOnly: isEmojiOnly(p.content),
+        }));
+
+        setuserSms((prev) => ({
+          ...prev,
+          [id]: messages,
+        }));
+
+        // Marquer les messages comme lus
+        await markMessageAsRead(id);
+      }
+    } catch (error) {
+      console.error("Erreur chargement messages:", error);
+    }
+  };
+
   const handleWriting = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    const dimitri = e.target.value;
-    setwrite(dimitri);
+    const text = e.target.value;
+    setwrite(text);
+
+    // Gestion de l'indicateur de frappe
+    if (socket && showUser?.id && user?.id) {
+      // Émettre que l'utilisateur est en train d'écrire au DESTINATAIRE
+      socket.emit("typing:start", {
+        userId: user.id,
+        receiverId: showUser.id,
+      });
+
+      setIsTyping(true);
+
+      // Effacer le timeout précédent
+      if (typingTimeout) {
+        clearTimeout(typingTimeout);
+      }
+
+      // Définir un nouveau timeout pour arrêter l'indicateur
+      const newTimeout = setTimeout(() => {
+        if (socket && showUser?.id && user?.id) {
+          socket.emit("typing:stop", {
+            userId: user.id,
+            receiverId: showUser.id,
+          });
+        }
+        setIsTyping(false);
+      }, 1000);
+
+      setTypingTimeout(newTimeout);
+    }
   };
+
   const handleEmojiSelect = (emoji: any) => {
     setwrite((prev) => prev + emoji.emoji);
   };
-  const isEmojiOnly = (text: string) =>
-    /^[\p{Extended_Pictographic}\s]+$/u.test(text);
+
+  const isEmojiOnly = (text: string) => {
+    const emojiRegex = /^[\p{Emoji}\s]+$/u;
+    return emojiRegex.test(text.trim());
+  };
 
   const cleanMessage = (text: string) => {
-    // Supprime les espaces ET les sauts de ligne vides à la fin
     return text.replace(/[\s\n\r]+$/g, "");
   };
-  const handlesend = () => {
-    if (!showUser || write.trim() === "") {
+
+  const handlesend = async () => {
+    if (!showUser || write.trim() === "" || !socket || !user?.id) {
+      toast.error("veuillez saisir un message avant d'envoyer");
       return;
     }
+
     const cleanText = cleanMessage(write);
     const emojiOnly = isEmojiOnly(write.trim());
-    const iduser = Date.now() + "" + Math.random().toString(36).substring(2, 9);
+
+    console.log("Envoi du message:", cleanText);
+
+    // Arrêter l'indicateur de frappe
+    if (showUser?.id && user?.id) {
+      socket.emit("typing:stop", {
+        userId: user.id,
+        receiverId: showUser.id,
+      });
+      setIsTyping(false);
+    }
+
     const hours = new Date().getHours().toString().padStart(2, "0");
     const minutes = new Date().getMinutes().toString().padStart(2, "0");
-    //dans notre tableau userSms on garde les anciens messages prev
-    //pour l'user showUser.id on affiche ses anciens messages ou un tableau vide
-    setuserSms((prev) => ({
-      ...prev,
-      [showUser.id]: [
-        ...(prev[showUser.id] || []),
-        {
-          id: iduser,
-          message: cleanText,
-          time: `${hours}:${minutes}`,
-          isEmojiOnly: emojiOnly,
-          timestamp: Date.now(),
-        },
-      ],
-    }));
+
+    // Message optimiste
+    const optimisticMessage = {
+      id: Date.now(),
+      senderId: user.id,
+      receiverId: showUser.id,
+      message: cleanText,
+      content: cleanText,
+      time: `${hours}:${minutes}`,
+      isEmojiOnly: emojiOnly,
+      timestamp: Date.now(),
+      isRead: false,
+      messageType: "text",
+    };
+
+    console.log("Message optimiste créé:", optimisticMessage);
+
+    // Mise à jour optimiste
+    setuserSms((prev) => {
+      const currentConv = prev[showUser.id] || [];
+      return {
+        ...prev,
+        [showUser.id]: [...currentConv, optimisticMessage],
+      };
+    });
+
     setwrite("");
+
+    try {
+      console.log("Envoi API du message...");
+      const response = await connect.post("/api/messages", {
+        receiverId: showUser.id,
+        content: cleanText,
+        messageType: "text",
+      });
+
+      console.log("Réponse API:", response.data);
+
+      if (response.data.success) {
+        const realMessage = response.data.message;
+        console.log("Message réel créé:", realMessage);
+
+        // Remplacer le message optimiste
+        setuserSms((prev) => {
+          const currentConv = prev[showUser.id] || [];
+          return {
+            ...prev,
+            [showUser.id]: currentConv.map((msg) =>
+              msg.id === optimisticMessage.id
+                ? {
+                    ...msg,
+                    id: realMessage.id,
+                    createdAt: realMessage.createdAt,
+                    time: new Date(realMessage.createdAt).toLocaleTimeString(
+                      [],
+                      {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      },
+                    ),
+                  }
+                : msg,
+            ),
+          };
+        });
+
+        // Émettre l'événement
+        socket.emit("message:sent", {
+          messageId: realMessage.id,
+          receiverId: showUser.id,
+        });
+      }
+    } catch (error: any) {
+      console.error("Erreur envoi message:", error);
+
+      // En cas d'erreur, retirer le message optimiste
+      setuserSms((prev) => {
+        const currentConv = prev[showUser.id] || [];
+        return {
+          ...prev,
+          [showUser.id]: currentConv.filter(
+            (msg) => msg.id !== optimisticMessage.id,
+          ),
+        };
+      });
+
+      // Remettre le texte
+      setwrite(cleanText);
+    }
   };
-  const handleSelect = (p: Friends) => {
+
+  const handleSelect = async (p: Friends) => {
+    console.log("Sélection de l'ami:", p);
     setshowUser(p);
+    setselectUser(p.id);
+
+    // Charger les messages
+    await loadsms(p.id);
+
+    // Marquer les messages comme lus
+    if (user?.id) {
+      await markMessageAsRead(p.id);
+    }
   };
+
   const handleChangeAll = (e: ChangeEvent<HTMLInputElement>) => {
-    const dimi = e.target.value;
-    settextesearch(dimi);
+    const searchText = e.target.value;
+    settextesearch(searchText);
     setuserfilter(
-      dimi
-        ? Friends.filter((p) =>
-            p.name.toLowerCase().includes(dimi.toLowerCase()),
+      searchText
+        ? friends.filter((p) =>
+            p.name.toLowerCase().includes(searchText.toLowerCase()),
           )
-        : Friends,
+        : friends,
     );
   };
+
   const handleClick = () => {
     alert("clic sur un lien");
   };
 
   const renderMessage = (text: string) => {
-    // Détection du lien "start.....quiz-IA"
     const regex = /(start\S*quiz-IA)/g;
 
     return text.split("\n").map((line, index, array) => {
@@ -130,29 +574,27 @@ const Message = ({ usersend }: AmiProps) => {
   };
 
   useEffect(() => {
-    if (usersend) {
-      const user = Friends.find((p) => p.id === usersend);
-      if (user) {
-        handleSelect(user);
-        setselectUser(user.id);
+    if (usersend && friends.length > 0) {
+      const foundUser = friends.find((p) => p.id === usersend);
+      if (foundUser) {
+        handleSelect(foundUser);
       }
     }
-  }, [usersend]);
-  //defilement vers derniers sms
+  }, [usersend, friends]);
+
+  // Défilement vers le bas
   useEffect(() => {
-    if (refslider.current) {
+    if (refslider.current && currentMessages.length > 0) {
       refslider.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [userSms[showUser?.id || 0]]);
+  }, [currentMessages]);
 
   const getLastMessageTimestamp = (userId: number): number => {
     const messages = userSms[userId] || [];
-    if (messages.length === 0) {
-      return 0;
-    }
-    //trouver le dernier message
+    if (messages.length === 0) return 0;
     return Math.max(...messages.map((message) => message.timestamp));
   };
+
   const getSortedMessages = () => {
     return [...userfilter].sort((a, b) => {
       const lastMessageA = getLastMessageTimestamp(a.id);
@@ -160,6 +602,71 @@ const Message = ({ usersend }: AmiProps) => {
       return lastMessageB - lastMessageA;
     });
   };
+
+  useEffect(() => {
+    const fetchFriends = async () => {
+      try {
+        console.log("Chargement des amis...");
+        const res = await connect.get("/api/friends");
+
+        const friendsList = res.data.friends.map((f: any) => ({
+          id: f.friend.id,
+          name: f.friend.userName,
+          photo: f.friend.userPhoto || "",
+        }));
+
+        console.log("Amis chargés:", friendsList);
+        setuserfilter(friendsList);
+        setfriends(friendsList);
+
+        // Charger les conversations
+        const conversationdata: Record<string, Message[]> = {};
+
+        for (const friend of friendsList) {
+          try {
+            const messagesRes = await connect.get(
+              `/api/messages/conversation/${friend.id}`,
+              { withCredentials: true },
+            );
+
+            if (messagesRes.data.success) {
+              conversationdata[friend.id] = messagesRes.data.messages.map(
+                (msg: any) => ({
+                  id: msg.id,
+                  senderId: msg.senderId,
+                  receiverId: msg.receiverId,
+                  message: msg.content,
+                  content: msg.content,
+                  time: new Date(msg.createdAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }),
+                  timestamp: new Date(msg.createdAt).getTime(),
+                  isRead: msg.isRead,
+                  isEmojiOnly: isEmojiOnly(msg.content),
+                }),
+              );
+            }
+          } catch (error) {
+            console.log(`Erreur chargement messages ${friend.id}:`, error);
+            conversationdata[friend.id] = [];
+          }
+        }
+
+        console.log("Conversations chargées:", conversationdata);
+        setuserSms(conversationdata);
+      } catch (err) {
+        console.error("Erreur chargement amis:", err);
+      }
+    };
+
+    fetchFriends();
+  }, []);
+
+  const isUserOnline = (userId: number) => {
+    return onlineUsers.includes(userId);
+  };
+
   return (
     <div className="headerFriends">
       <div className="headerFriendsLeft">
@@ -169,28 +676,37 @@ const Message = ({ usersend }: AmiProps) => {
             type="search"
             onChange={handleChangeAll}
             value={textesearch}
-            name=""
-            id=""
             placeholder="saisir le nom de votre ami(e)s"
           />
         </div>
         <div className="FriendsMain">
           {userfilter.length > 0 ? (
             <>
-              {getSortedMessages().map((p) => (
-                <div
-                  className={`FriendsMainItems ${selectUser === p.id ? "active" : ""}`}
-                  key={p.id}
-                  onClick={() => {
-                    setselectUser(p.id);
-                    handleSelect(p);
-                  }}
-                >
-                  <img src={p.photo} alt="" />
-                  <p>{p.name}</p>
-                  <span>10</span>
-                </div>
-              ))}
+              {getSortedMessages().map((p) => {
+                const unreadCount =
+                  userSms[p.id]?.filter(
+                    (msg) => !msg.isRead && msg.senderId === p.id,
+                  ).length || 0;
+
+                return (
+                  <div
+                    className={`FriendsMainItems ${selectUser === p.id ? "active" : ""}`}
+                    key={p.id}
+                    onClick={() => handleSelect(p)}
+                  >
+                    <img src={p.photo} alt={p.name} />
+                    <div className="flex-column">
+                      <p>{p.name}</p>
+                      {typingUsers[p.id] && (
+                        <p className="text-white">est en train d'écrire...</p>
+                      )}
+                    </div>
+                    {unreadCount > 0 && (
+                      <span className="unread-count">{unreadCount}</span>
+                    )}
+                  </div>
+                );
+              })}
             </>
           ) : (
             <p className="text-center">Aucun ami trouvé 🥲</p>
@@ -202,39 +718,58 @@ const Message = ({ usersend }: AmiProps) => {
           <>
             <div className="headerSmsRightDescription">
               <div className="UserDescribeSms">
-                <img src={showUser.photo} alt="" />
-                <span>🟢</span>
+                <img
+                  src={showUser.photo || "/default-avatar.png"}
+                  alt={showUser.name}
+                />
+                <span> {isUserOnline(showUser.id) ? "🟢" : "⚫"}</span>
               </div>
-              <p>{showUser.name}</p>
+              <div className="user-info">
+                <p className="user-name">{showUser.name}</p>
+              </div>
             </div>
 
             <div className="SmsMain">
-              {(userSms[showUser.id] || []).map((p, index) => (
-                <div className="SmsMainContent" key={`${p.id}-${index}`}>
-                  <div className="SmsHome">
-                    <p className={p.isEmojiOnly ? "emojiOnly" : ""}>
-                      {renderMessage(p.message)}
-                    </p>
-                    <span>{p.time}</span>
+              {currentMessages.map((p, index) => {
+                const iscurrentuser = p.senderId === user?.id;
+                return (
+                  <div className="message-container" key={`${p.id}-${index}`}>
+                    {iscurrentuser ? (
+                      <div className="SmsMainContent">
+                        <div className="SmsHome">
+                          <p className={p.isEmojiOnly ? "emojiOnly" : ""}>
+                            {renderMessage(p.message)}
+                          </p>
+                          <span className="message-time">{p.time}</span>
+                        </div>
+                        <div className="message-status">
+                          <span
+                            className={`read-status ${p.isRead ? "read" : "unread"}`}
+                          >
+                            {p.isRead ? "✔️✔️" : "✔️"}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="SmsMainContentAway">
+                        <div className="SmsAway">
+                          <p className={p.isEmojiOnly ? "emojiOnly" : ""}>
+                            {renderMessage(p.message)}
+                          </p>
+                          <span className="message-time">{p.time}</span>
+                        </div>
+                        <div className="message-status">
+                          <span className="read-status">
+                            {p.isRead ? "✔️✔️" : "✔️"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <p className="views">✔️✔️</p>
-                </div>
-              ))}
+                );
+              })}
 
-              {/* Exemple d'un message venant de l'autre personne */}
-              <div className="SmsMainContentAway">
-                <p>✔️✔️</p>
-                <div className="SmsAway">
-                  <p>
-                    Lorem ipsum dolor sit amet consectetur, adipisicing elit.
-                    Amet accusamus modi dolores nam vel voluptatum magnam
-                    ducimus, facilis totam minus nulla veniam molestias a
-                    debitis animi unde sunt assumenda non.
-                  </p>
-                  <span>10:00</span>
-                </div>
-              </div>
-              <div className="" ref={refslider}></div>
+              <div className="scroll-anchor" ref={refslider}></div>
             </div>
 
             <div className="SmsSend">
@@ -250,7 +785,7 @@ const Message = ({ usersend }: AmiProps) => {
                   name="write"
                   value={write}
                   onChange={handleWriting}
-                  placeholder="saisir votre message et envoyer"
+                  placeholder="Saisir votre message et cliquer sur le bouton envoyer"
                   spellCheck
                 ></textarea>
               </div>
@@ -263,7 +798,38 @@ const Message = ({ usersend }: AmiProps) => {
         ) : (
           <div id="lauchtext">
             <p>Veuillez choisir un ami(e)s pour commencer la conversation.</p>
-            <img src={logo} alt="" />
+            <img src={logo} alt="Logo" />
+
+            {/* Section utilisateurs en ligne 
+            <div className="online-users-info">
+              <h3>Utilisateurs en ligne ({onlineUsers.length})</h3>
+              <div className="online-users-list">
+                {friends
+                  .filter((friend) => isUserOnline(friend.id))
+                  .map((friend) => (
+                    <div
+                      key={friend.id}
+                      className="online-friend-item"
+                      onClick={() => handleSelect(friend)}
+                    >
+                      <img
+                        src={friend.photo || "/default-avatar.png"}
+                        alt={friend.name}
+                      />
+                      <span>{friend.name} 🟢</span>
+                    </div>
+                  ))}
+                {friends.filter((friend) => isUserOnline(friend.id)).length ===
+                  0 && <p>Aucun ami en ligne pour le moment</p>}
+              </div>
+            </div>
+
+             Débug Socket.IO 
+            <div className="debug-info" style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
+              <p>Socket ID: {socket?.id || 'Non connecté'}</p>
+              <p>Utilisateur ID: {user?.id || 'Non connecté'}</p>
+              <p>Statut Socket: {socket?.connected ? '🟢 Connecté' : '🔴 Déconnecté'}</p>
+            </div>*/}
           </div>
         )}
       </div>

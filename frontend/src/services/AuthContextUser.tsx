@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import connect from "./Util";
 import { useNavigate } from "react-router-dom";
@@ -42,6 +42,7 @@ export const useAuth = (): AuthContextType => {
 export const AuthProviderUser = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+
   const navigate = useNavigate();
 
   //charger les infos de l'utilisateur

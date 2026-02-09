@@ -54,11 +54,25 @@ const avatarFileFilter = (req, file, cb) => {
 };
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|mp4|avi|mov|pdf|mp3|wav/;
-  const extname = allowedTypes.test(
+  const allowedExtensions = /jpeg|jpg|png|gif|mp4|avi|mov|pdf|mp3|wav|docx|doc/;
+  const allowedMimeTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "video/mp4",
+    "video/avi",
+    "video/quicktime", // mov
+    "application/pdf",
+    "audio/mpeg", // mp3
+    "audio/wav",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // docx
+    "application/msword", // doc
+  ];
+
+  const extname = allowedExtensions.test(
     path.extname(file.originalname).toLowerCase(),
   );
-  const mimetype = allowedTypes.test(file.mimetype);
+  const mimetype = allowedMimeTypes.includes(file.mimetype);
 
   if (mimetype && extname) {
     return cb(null, true);

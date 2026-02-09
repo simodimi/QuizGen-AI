@@ -1,117 +1,204 @@
-const pdf = require("pdf-parse");
+const { PDFParse } = require("pdf-parse");
 const mammoth = require("mammoth");
 const fs = require("fs").promises;
 
-/**
- * Extrait le texte d'un fichier PDF, DOCX ou TXT
- */
 const extractTextFromFile = async (filePath, mimeType) => {
   try {
+    console.log(`Extraction depuis: ${filePath}, type: ${mimeType}`);
+
     if (mimeType === "application/pdf") {
-      const dataBuffer = await fs.readFile(filePath);
-      const pdfData = await pdf(dataBuffer);
-      return pdfData.text;
-    } else if (
+      const buffer = await fs.readFile(filePath);
+      console.log(`Taille du PDF: ${buffer.length} bytes`);
+
+      const parser = new PDFParse({ data: buffer });
+      const result = await parser.getText();
+      await parser.destroy();
+
+      let text = result.text
+        .replace(/[\u00A0\u202F]/g, " ")
+        .replace(/[\r\n]+/g, "\n")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      console.log(`Texte extrait: ${text.length} caractères`);
+
+      if (text.length < 50) {
+        console.warn("ATTENTION: Texte très court extrait");
+        return text;
+      }
+
+      return text;
+    }
+
+    // Pour les fichiers Word (.docx)
+    if (
       mimeType ===
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     ) {
       const result = await mammoth.extractRawText({ path: filePath });
-      return result.value;
-    } else if (mimeType === "text/plain") {
-      return await fs.readFile(filePath, "utf-8");
-    } else {
-      throw new Error(`Type de fichier non supporté: ${mimeType}`);
+      let text = result.value
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/[\u201C\u201D]/g, '"')
+        .replace(/[\u2026]/g, "...")
+        .replace(/[\u2013\u2014]/g, "-")
+        .replace(/\s+/g, " ")
+        .trim();
+      return text;
     }
+
+    // Pour les fichiers texte (.txt)
+    if (mimeType === "text/plain") {
+      const content = await fs.readFile(filePath, "utf-8");
+      let text = content
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/[\u201C\u201D]/g, '"')
+        .replace(/[\u2026]/g, "...")
+        .replace(/[\u2013\u2014]/g, "-")
+        .replace(/\s+/g, " ")
+        .trim();
+      return text;
+    }
+
+    throw new Error(`Type de fichier non supporté: ${mimeType}`);
   } catch (error) {
     console.error("Erreur extraction texte:", error);
-    throw new Error(`Impossible d'extraire le texte: ${error.message}`);
+
+    // Essayer une extraction de secours pour PDF seulement
+    if (mimeType === "application/pdf") {
+      try {
+        console.log("Tentative d'extraction de secours...");
+        const buffer = await fs.readFile(filePath);
+        const parser = new PDFParse({ data: buffer });
+        const result = await parser.getText();
+        await parser.destroy();
+        return result.text
+          .replace(/\s+/g, " ")
+          .replace(/[^\x00-\x7F]/g, " ")
+          .trim();
+      } catch (fallbackError) {
+        console.error("Échec extraction de secours:", fallbackError);
+      }
+    }
+    throw error;
   }
 };
 
-/**
- * Détecte les sections dans un texte
- * Découpe par paragraphes, titres, etc.
- */
-const detectSections = (textContent, maxWordsPerSection = 1500) => {
+const detectSectionsIntelligent = (textContent, maxWordsPerSection = 1000) => {
   if (!textContent || textContent.trim().length === 0) {
-    return [];
+    return [{ title: "Document entier", content: textContent, order: 1 }];
   }
 
-  // Normaliser les sauts de ligne
-  const normalizedText = textContent
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n");
+  const lines = textContent
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 
-  // Séparer par doubles sauts de ligne (paragraphes)
-  const paragraphs = normalizedText
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
-
-  // Regrouper les paragraphes en sections
   const sections = [];
   let currentSection = [];
-  let currentWordCount = 0;
+  let currentTitle = null;
 
-  for (const paragraph of paragraphs) {
-    const wordCount = paragraph.split(/\s+/).length;
+  const sectionPatterns = [
+    /^(PROFIL|PROFILE|À PROPOS|ABOUT)/i,
+    /^(EXPÉRIENCES|EXPERIENCES|EXPÉRIENCE PROFESSIONNELLE)/i,
+    /^(FORMATION|EDUCATION)/i,
+    /^(COMPÉTENCES|SKILLS|COMPETENCES)/i,
+    /^(PROJETS|PROJECTS|RÉALISATIONS)/i,
+    /^(LANGUES|LANGUAGES)/i,
+    /^(CENTRES D'INTÉRÊT|INTERESTS|HOBBIES)/i,
+    /^(CERTIFICATIONS|CERTIFICATS)/i,
+    /^(SOMMAIRE|TABLE DES MATIÈRES|CONTENTS)/i,
+    /^(INTRODUCTION)/i,
+    /^(CONCLUSION)/i,
+    /^(RÉFÉRENCES|BIBLIOGRAPHIE)/i,
+  ];
 
-    // Détecter si c'est un titre (courte phrase, se termine par :, pas de point, majuscules)
-    const isLikelyTitle =
-      paragraph.length < 100 &&
-      (paragraph.endsWith(":") ||
-        !paragraph.includes(".") ||
-        /^[A-ZÀ-ÿ0-9][^.!?]*$/.test(paragraph));
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    let isSectionTitle = false;
 
-    if (isLikelyTitle || currentWordCount + wordCount > maxWordsPerSection) {
-      // Créer une nouvelle section
+    for (const pattern of sectionPatterns) {
+      if (pattern.test(line)) {
+        isSectionTitle = true;
+        break;
+      }
+    }
+
+    if (!isSectionTitle) {
+      isSectionTitle =
+        (line.length < 100 && (line.endsWith(":") || line.endsWith("."))) ||
+        /^[A-ZÀ-ÖØ-Þ\s\d-]{3,50}$/.test(line) ||
+        /^[IVXLCDM]+\.\s+[A-Z]/.test(line) ||
+        /^\d+\.\s+[A-Z]/.test(line);
+    }
+
+    if (isSectionTitle) {
       if (currentSection.length > 0) {
         sections.push({
-          title:
-            currentSection[0]?.split("\n")[0]?.substring(0, 100) ||
-            `Section ${sections.length + 1}`,
-          content: currentSection.join("\n\n"),
+          title: currentTitle || `Section ${sections.length + 1}`,
+          content: currentSection.join("\n"),
           order: sections.length + 1,
-          wordCount: currentWordCount,
+          wordCount: currentSection.join(" ").split(/\s+/).length,
         });
       }
 
-      currentSection = [paragraph];
-      currentWordCount = wordCount;
+      currentTitle = line;
+      currentSection = [];
     } else {
-      currentSection.push(paragraph);
-      currentWordCount += wordCount;
+      currentSection.push(line);
     }
   }
 
-  // Ajouter la dernière section
   if (currentSection.length > 0) {
     sections.push({
-      title:
-        currentSection[0]?.split("\n")[0]?.substring(0, 100) ||
-        `Section ${sections.length + 1}`,
-      content: currentSection.join("\n\n"),
+      title: currentTitle || `Section ${sections.length + 1}`,
+      content: currentSection.join("\n"),
       order: sections.length + 1,
-      wordCount: currentWordCount,
+      wordCount: currentSection.join(" ").split(/\s+/).length,
     });
   }
 
-  // Si aucune section n'a été détectée, créer une seule section
   if (sections.length === 0) {
-    sections.push({
-      title: "Document entier",
-      content: textContent,
-      order: 1,
-      wordCount: textContent.split(/\s+/).length,
-    });
+    const paragraphs = textContent
+      .split(/\n\s*\n/)
+      .filter((p) => p.trim().length > 0);
+    let currentContent = [];
+    let currentWordCount = 0;
+
+    for (const paragraph of paragraphs) {
+      const wordCount = paragraph.split(/\s+/).length;
+
+      if (
+        currentWordCount + wordCount > maxWordsPerSection &&
+        currentContent.length > 0
+      ) {
+        sections.push({
+          title: `Partie ${sections.length + 1}`,
+          content: currentContent.join("\n\n"),
+          order: sections.length + 1,
+          wordCount: currentWordCount,
+        });
+        currentContent = [paragraph];
+        currentWordCount = wordCount;
+      } else {
+        currentContent.push(paragraph);
+        currentWordCount += wordCount;
+      }
+    }
+
+    if (currentContent.length > 0) {
+      sections.push({
+        title: `Partie ${sections.length + 1}`,
+        content: currentContent.join("\n\n"),
+        order: sections.length + 1,
+        wordCount: currentWordCount,
+      });
+    }
   }
 
+  console.log(`Document découpé en ${sections.length} sections intelligentes`);
   return sections;
 };
 
-/**
- * Version simple de détection de sections (fallback)
- */
 const detectSectionsSimple = (textContent, maxLength = 2000) => {
   const sections = [];
   const words = textContent.split(/\s+/);
@@ -132,6 +219,6 @@ const detectSectionsSimple = (textContent, maxLength = 2000) => {
 
 module.exports = {
   extractTextFromFile,
-  detectSections,
+  detectSections: detectSectionsIntelligent,
   detectSectionsSimple,
 };

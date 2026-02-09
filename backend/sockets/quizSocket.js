@@ -203,9 +203,9 @@ module.exports = (io, socket) => {
         }
 
         // Calculer le score
-        const basePoints = 1;
-        const timeBonus = timeSpent < 10 ? 0.5 : 0;
-        const scoreEarned = isCorrect ? basePoints + timeBonus : 0;
+        const basePoints = question.points || 1;
+        //const timeBonus = timeSpent < 10 ? 0.5 : 0;
+        scoreEarned = isCorrect ? basePoints /*+ timeBonus*/ : 0;
 
         // Mettre à jour l'état
         if (!quizState.participants.has(socket.userId)) {

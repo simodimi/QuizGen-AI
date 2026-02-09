@@ -12,7 +12,7 @@ import { Link, useLocation } from "react-router-dom";
 interface AmiProps {
   countFriends: number;
 }
-const Sidebar = ({ countFriends }: AmiProps) => {
+const Sidebar = () => {
   const [select, setselect] = useState<string>("quiz");
   const location = useLocation();
   useEffect(() => {
@@ -66,7 +66,7 @@ const Sidebar = ({ countFriends }: AmiProps) => {
               <div className="SiderbarIcone">
                 <img src={img2} alt="" />
                 <p>Ami(e)s</p>
-                <span>{countFriends}</span>
+                <span>{0}</span>
               </div>
             </Link>
           </div>
@@ -168,7 +168,7 @@ const Sidebar = ({ countFriends }: AmiProps) => {
               <div className="SiderbarIcone">
                 <img src={img2} alt="" />
                 <p>Ami(e)s</p>
-                <span>{countFriends}</span>
+                <span>{0}</span>
               </div>
             </Link>
           </div>

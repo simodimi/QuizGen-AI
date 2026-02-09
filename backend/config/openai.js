@@ -1,6 +1,10 @@
-const { OpenAI } = require("openai");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 require("dotenv").config();
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+const model = genAI.getGenerativeModel({
+  model: "gemini-1.5-flash",
 });
-module.exports = { openai };
+
+module.exports = { genAI, model };

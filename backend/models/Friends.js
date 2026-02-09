@@ -13,7 +13,7 @@ const Friend = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    receiverId: {
+    addresseeId: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
@@ -35,7 +35,7 @@ const Friend = sequelize.define(
       //empêcher les amis doublons
       {
         unique: true,
-        fields: ["requesterId", "receiverId"],
+        fields: ["requesterId", "addresseeId"],
       },
     ],
   },

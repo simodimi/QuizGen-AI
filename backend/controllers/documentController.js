@@ -266,7 +266,31 @@ const getDocumentDetails = async (req, res) => {
     res.status(500).json({ message: "Erreur serveur" });
   }
 };
+const downloadDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
 
+    const document = await Document.findOne({
+      where: { id, userId },
+    });
+
+    if (!document) {
+      return res
+        .status(404)
+        .json({ message: "Document non trouvé ou accès refusé" });
+    }
+
+    if (!document.path || !fs.existsSync(document.path)) {
+      return res.status(404).json({ message: "Fichier introuvable" });
+    }
+
+    res.download(document.path, document.fileName);
+  } catch (error) {
+    console.error("Erreur téléchargement document:", error);
+    res.status(500).json({ message: "Erreur lors du téléchargement" });
+  }
+};
 module.exports = {
   uploadDocument,
   getMyDocuments,
@@ -274,4 +298,5 @@ module.exports = {
   deleteDocument,
   shareDocument,
   getDocumentDetails,
+  downloadDocument,
 };

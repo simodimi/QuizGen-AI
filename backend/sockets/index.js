@@ -1,40 +1,49 @@
+/*// backend/sockets/index.js - MODIFIE juste cette partie
 const { Server } = require("socket.io");
 const { socketAuth } = require("../middlewares/authMiddleware");
-
 const quizSocketHandler = require("./quizSocket");
 const chatSocketHandler = require("./chatSocket");
-/*const presenceSocketHandler = require("./presenceSocket");*/
+const friendSocketHandler = require("./friendSocket");
 
 function initSockets(server) {
   const io = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+      origin: "http://localhost:5173",
       credentials: true,
-    },
-    connectionStateRecovery: {
-      maxDisconnectionDuration: 2 * 60 * 1000,
+      methods: ["GET", "POST"],
     },
   });
 
   // Middleware d'authentification Socket
   io.use(socketAuth);
+  io.use((socket, next) => {
+    const userId = socket.handshake.auth?.userId;
 
+    if (!userId) {
+      return next(new Error("Unauthorized socket"));
+    }
+
+    socket.userId = userId;
+    next();
+  });
+  const onlineUsers = new Map(); // userId => socketId
   io.on("connection", (socket) => {
-    console.log(
-      `Nouvelle connexion Socket: ${socket.id} (user: ${socket.userId})`,
-    );
+    const userId = socket.userId;
 
-    // Rejoindre la room de l'utilisateur
-    socket.join(`user_${socket.userId}`);
-
-    // Initialiser les handlers
-    /*presenceSocketHandler(io, socket);*/
     quizSocketHandler(io, socket);
     chatSocketHandler(io, socket);
+    friendSocketHandler(io, socket);
 
-    // Déconnexion
-    socket.on("disconnect", (reason) => {
-      console.log(`Socket déconnecté: ${socket.id} - Raison: ${reason}`);
+    onlineUsers.set(userId, socket.id);
+    io.emit("user_online", userId);
+
+    socket.on("get_online_users", () => {
+      socket.emit("online_users", [...onlineUsers.keys()]);
+    });
+
+    socket.on("disconnect", () => {
+      onlineUsers.delete(userId);
+      io.emit("user_offline", userId);
     });
   });
 
@@ -44,4 +53,4 @@ function initSockets(server) {
   return io;
 }
 
-module.exports = { initSockets };
+module.exports = { initSockets };*/

@@ -129,14 +129,14 @@ const getSocialStatistics = async (userId) => {
   const friendsCount = await Friend.count({
     where: {
       status: "accepter",
-      [Op.or]: [{ requesterId: userId }, { receiverId: userId }],
+      [Op.or]: [{ requesterId: userId }, { addresseeId: userId }],
     },
   });
 
   const pendingRequests = await Friend.count({
     where: {
       status: "attente",
-      receiverId: userId,
+      addresseeId: userId,
     },
   });
 
@@ -145,7 +145,7 @@ const getSocialStatistics = async (userId) => {
   });
 
   const messagesReceived = await Message.count({
-    where: { receiverId: userId },
+    where: { addresseeId: userId },
   });
 
   return {
@@ -250,12 +250,12 @@ const getFriendsLeaderboard = async (req, res) => {
     const friendships = await Friend.findAll({
       where: {
         status: "accepter",
-        [Op.or]: [{ requesterId: userId }, { receiverId: userId }],
+        [Op.or]: [{ requesterId: userId }, { addresseeId: userId }],
       },
     });
 
     const friendIds = friendships.map((f) =>
-      f.requesterId === userId ? f.receiverId : f.requesterId,
+      f.requesterId === userId ? f.addresseeId : f.requesterId,
     );
 
     const allUserIds = [...friendIds, userId];

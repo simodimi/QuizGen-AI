@@ -49,8 +49,8 @@ const submitAnswer = async (req, res) => {
     }
 
     const basePoints = question.points || 1;
-    const timeBonus = timeSpent < 10 ? 0.5 : 0;
-    scoreEarned = isCorrect ? basePoints + timeBonus : 0;
+    //const timeBonus = timeSpent < 10 ? 0.5 : 0;
+    scoreEarned = isCorrect ? basePoints /*+ timeBonus*/ : 0;
 
     const quizAnswer = await QuizAnswer.create({
       quizId,

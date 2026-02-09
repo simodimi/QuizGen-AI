@@ -1,23 +1,13 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import Button from "../components/ui/Button";
 import { useNavigate } from "react-router-dom";
 import a1 from "../assets/icone/logo.png";
 import { Avatar } from "../store/Frontbdd";
 import vd from "../assets/Vd.mp4";
 import "../style/quiz.css";
-
-interface QuizAutoProps {
-  setpassdocument: Dispatch<
-    SetStateAction<{ file: File; createdAt: number }[]>
-  >;
-}
-const QuizAuto = ({ setpassdocument }: QuizAutoProps) => {
+import connect from "../services/Util";
+import { useAuth } from "../services/AuthContextUser";
+const QuizAuto = () => {
   const [avatar, setavatar] = useState<string | null>(null);
   const [startquiz] = useState<boolean>(true);
   const [message] = useState<string>("");
@@ -29,6 +19,7 @@ const QuizAuto = ({ setpassdocument }: QuizAutoProps) => {
   const [step1, setstep1] = useState<boolean>(true);
   const [step2, setstep2] = useState<boolean>(false);
   const [step3, setstep3] = useState<boolean>(false);
+  const { user } = useAuth();
   const navigate = useNavigate();
   const handleback = () => {
     if (step2) {
@@ -90,14 +81,30 @@ const QuizAuto = ({ setpassdocument }: QuizAutoProps) => {
     setstep2(false);
     setstep1(false);
   };
-  const handlesoloplay = () => {
+  const handlesoloplay = async () => {
     if (!storefile) {
       return;
     }
-    setpassdocument((prev) => [
-      ...prev,
-      { file: storefile, createdAt: Date.now() },
-    ]);
+    try {
+      const formdata = new FormData();
+      formdata.append("file", storefile);
+      const res = await connect.post("/api/documents/", formdata);
+      if (res.status === 201) {
+        console.log("Document envoyé avec succès");
+        // Stocker les infos du document dans localStorage
+        localStorage.setItem(
+          "lastUploadedDocument",
+          JSON.stringify({
+            id: res.data.document.id,
+            fileName: res.data.document.fileName,
+          }),
+        );
+        // Naviguer vers la page QuizAutoSolo
+        navigate("/home/solo");
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'envoi du document:", error);
+    }
   };
   return (
     <div className="QuizHeader">
@@ -115,7 +122,7 @@ const QuizAuto = ({ setpassdocument }: QuizAutoProps) => {
       {step1 && (
         <div className="QuizHeaderTitles">
           <img src={a1} alt="" />
-          <h1>Hello dimitri,tu veux générer ton propre quiz</h1>
+          <h1>Hello {user?.userName}, tu veux générer ton propre quiz</h1>
           <Button className="accept" onClick={handlestart}>
             Allez suis moi 🤖
           </Button>
@@ -158,7 +165,7 @@ const QuizAuto = ({ setpassdocument }: QuizAutoProps) => {
       {step3 && (
         <div className="QuizHeaderTitles">
           <img src={a1} alt="" />
-          <h1>Hello dimitri,tu veux quoi?</h1>
+          <h1>Hello {user?.userName},tu veux quoi?</h1>
           <div className="flex gap-7">
             <Button className="retour" onClick={handlesoloplay}>
               Jouer en mode solo

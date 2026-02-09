@@ -131,15 +131,15 @@ User.belongsToMany(User, {
   //colonne dans Friend qui représente l'utilisateur qui envoie la demande d'amitié
   foreignKey: "requesterId",
   //colonne dans Friend qui représente l'utilisateur qui reçoit la demande d'amitié
-  otherKey: "receiverId",
+  otherKey: "addresseeId",
 });
 Friend.belongsTo(User, {
   foreignKey: "requesterId",
   as: "requester",
 });
 Friend.belongsTo(User, {
-  foreignKey: "receiverId",
-  as: "receiver",
+  foreignKey: "addresseeId",
+  as: "addressee",
 });
 
 // User -> Message (sent) (1:N)
@@ -161,7 +161,7 @@ User.hasMany(Message, {
 });
 Message.belongsTo(User, {
   foreignKey: "receiverId",
-  as: "receiver",
+  as: "addressee",
 });
 
 // Message -> Message (reply) (auto-référence)

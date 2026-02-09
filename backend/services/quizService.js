@@ -4,6 +4,8 @@ const {
   QuizParticipant,
   User,
 } = require("../models/Association");
+const UserProgress = require("../models/UserProgress");
+const QuizAnswer = require("../models/QuizAnswer");
 const { Op } = require("sequelize");
 
 const createQuiz = async (quizData, questions = []) => {
@@ -115,10 +117,10 @@ const submitAnswer = async (quizId, questionId, userId, answer, timeSpent) => {
   }
   // Calcul du score
   const basePoints = question.points || 1;
-  const timeBonus = timeSpent < 10 ? 0.5 : 0;
-  const scoreEarned = isCorrect ? basePoints + timeBonus : 0;
+  //const timeBonus = timeSpent < 10 ? 0.5 : 0;
+  scoreEarned = isCorrect ? basePoints /*+ timeBonus*/ : 0;
   // Enregistrer la réponse
-  const quizAnswer = await require("../models").QuizAnswer.create({
+  const quizAnswer = await QuizAnswer.create({
     quizId,
     questionId,
     userId,
@@ -199,7 +201,7 @@ const endQuiz = async (quizId, creatorId) => {
 };
 
 const updateUserProgress = async (userId, score) => {
-  const progress = await require("../models").UserProgress.findOne({
+  const progress = await UserProgress.findOne({
     where: { userId },
   });
   if (progress) {
@@ -211,7 +213,7 @@ const updateUserProgress = async (userId, score) => {
     }
     await progress.save();
   } else {
-    await require("../models").UserProgress.create({
+    await UserProgress.create({
       userId,
       totalGames: 1,
       totalScore: score,

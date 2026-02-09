@@ -3,19 +3,21 @@ import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
-import a1 from "../assets/avatar/A1.jpg";
 import img1 from "../assets/icone/un.png";
 import img2 from "../assets/icone/deux.png";
 import img3 from "../assets/icone/trois.png";
 import img4 from "../assets/icone/oth.png";
 import "../style/doc.css";
+import { useAuth } from "../services/AuthContextUser";
 const Result = () => {
-  const [avatar, setavatar] = useState<string>(a1);
+  const { user } = useAuth();
+  const [avatar] = useState<string>(user?.userPhoto || "");
   const [open, setopen] = useState<boolean>(false);
-  const [message, setmessage] = useState<string>("Hello dimitri,vos resultats");
+  const [message] = useState<string>(`Hello ${user?.userName}, vos resultats`);
   const handleclose = () => {
     setopen(false);
   };
+
   return (
     <div className="QuizHeader">
       <div className="QuizHeaderBtn">

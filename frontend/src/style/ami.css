@@ -350,7 +350,7 @@
 }
 .SmsAway {
   background-color: #79ebf1;
-  width: 100%;
+  width: fit-content;
   max-width: 700px;
   height: fit-content;
   padding: 10px 15px;
@@ -360,12 +360,7 @@
   white-space: pre-wrap;
   overflow-wrap: break-word;
 }
-.SmsMainContentAway {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: end;
-}
+
 .SmsHome span,
 .SmsAway span {
   display: flex;
@@ -378,6 +373,12 @@
   display: flex;
   gap: 10px;
   align-items: center;
+}
+.SmsMainContentAway {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: end;
 }
 .FriendsMainItems span {
   position: absolute;
@@ -403,6 +404,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  text-align: center;
   height: 100vh;
   width: 100%;
   font-size: 30px;

@@ -11,7 +11,7 @@ const { Op } = require("sequelize");
 const quizService = require("../services/quizService");
 const aiQuizService = require("../services/iaQuizService");
 
-const generateQuizFromDocument = async (req, res) => {
+/*const generateQuizFromDocument = async (req, res) => {
   try {
     const { documentId } = req.params;
     const {
@@ -19,6 +19,127 @@ const generateQuizFromDocument = async (req, res) => {
       questionCount = 10,
       difficulty = "medium",
     } = req.body;
+  // Vérifier et limiter le nombre de questions
+    const MIN_QUESTIONS = 5;
+    const MAX_QUESTIONS = 30;
+    
+    let validatedQuestionCount = parseInt(questionCount) || 10;
+    
+    // Appliquer les limites
+    if (validatedQuestionCount < MIN_QUESTIONS) {
+      validatedQuestionCount = MIN_QUESTIONS;
+    } else if (validatedQuestionCount > MAX_QUESTIONS) {
+      validatedQuestionCount = MAX_QUESTIONS;
+    }
+    // Vérifier si documentId est valide
+    if (!documentId || isNaN(documentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "ID de document invalide",
+      });
+    }
+
+    const document = await Document.findByPk(documentId, {
+      include: [{ model: Section, as: "sections" }],
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Document non trouvé",
+      });
+    }
+
+    // Vérifier les permissions
+    if (document.userId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Accès refusé",
+      });
+    }
+
+    // Vérifier si le document a des sections
+    if (!document.sections || document.sections.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Le document ne contient pas de sections valides",
+      });
+    }
+
+    const context = document.sections.map((s) => s.content).join("\n\n");
+  const wordCount = context.split(/\s+/).length;
+    
+    // Ajuster dynamiquement selon la longueur du document
+    let adjustedQuestionCount = validatedQuestionCount;
+    
+    if (wordCount < 500) {
+      // Document très court
+      adjustedQuestionCount = Math.min(validatedQuestionCount, 8);
+      console.log(`Document court (${wordCount} mots), questions réduites à: ${adjustedQuestionCount}`);
+    } else if (wordCount < 1500) {
+      // Document moyen
+      adjustedQuestionCount = Math.min(validatedQuestionCount, 15);
+      console.log(`Document moyen (${wordCount} mots), questions limitées à: ${adjustedQuestionCount}`);
+    }
+    // Limiter la longueur du texte pour l'API
+    const maxLength = 5000;
+    const truncatedContext =
+      context.length > maxLength
+        ? context.substring(0, maxLength) + "..."
+        : context;
+
+    const aiResult = await aiQuizService.generateQuizFromText(
+      truncatedContext,
+      {
+        questionCount: Math.min(questionCount, 20), // Limiter à 20 questions max
+        difficulty,
+      },
+    );
+
+    const quiz = await quizService.createQuiz(
+      {
+        title: aiResult.title || `Quiz - ${document.fileName}`,
+        creatorId: req.user.id,
+        documentId: documentId,
+        mode: mode,
+        difficulty: difficulty,
+        questionCount: aiResult.questions.length,
+        timeLimit: 40,
+        status: "waiting",
+        isGeneratedByAI: true,
+      },
+      aiResult.questions,
+    );
+
+    let invitationCode = null;
+    if (mode === "multi") {
+      invitationCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      quiz.invitationCode = invitationCode;
+      await quiz.save();
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Quiz généré avec succès",
+      quizId: quiz.id,
+      invitationCode,
+      questionCount: aiResult.questions.length,
+        originalRequested: questionCount,
+      adjustedTo: adjustedQuestionCount,
+      mode,
+    });
+  } catch (error) {
+    console.error("Erreur génération quiz:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Erreur lors de la génération",
+    });
+  }
+};*/
+const generateQuizFromDocument = async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const { mode = "solo", difficulty = "medium" } = req.body;
 
     const document = await Document.findByPk(documentId, {
       include: [{ model: Section, as: "sections" }],
@@ -30,9 +151,21 @@ const generateQuizFromDocument = async (req, res) => {
         .json({ message: "Document non trouvé ou accès refusé" });
     }
 
+    // Concaténer tout le contenu
     const context = document.sections.map((s) => s.content).join("\n\n");
+
+    // Analyser le document pour déterminer le nombre optimal de questions
+    const optimalQuestionCount = calculateOptimalQuestionCount(context);
+
+    console.log(
+      `Document analysé - Longueur: ${context.length} caractères, ${context.split(/\s+/).length} mots`,
+    );
+    console.log(
+      `Nombre optimal de questions déterminé: ${optimalQuestionCount}`,
+    );
+
     const aiResult = await aiQuizService.generateQuizFromText(context, {
-      questionCount,
+      questionCount: optimalQuestionCount,
       difficulty,
     });
 
@@ -64,7 +197,13 @@ const generateQuizFromDocument = async (req, res) => {
       quizId: quiz.id,
       invitationCode,
       questionCount: aiResult.questions.length,
+      optimalQuestionCount: optimalQuestionCount,
       mode,
+      documentStats: {
+        characters: context.length,
+        words: context.split(/\s+/).length,
+        sections: document.sections.length,
+      },
     });
   } catch (error) {
     console.error("Erreur génération quiz:", error);
@@ -75,6 +214,39 @@ const generateQuizFromDocument = async (req, res) => {
   }
 };
 
+// Fonction pour calculer le nombre optimal de questions
+const calculateOptimalQuestionCount = (text) => {
+  if (!text || text.trim().length === 0) {
+    return 5; // Minimum par défaut
+  }
+
+  const cleanedText = text.trim();
+  const characterCount = cleanedText.length;
+  const wordCount = cleanedText.split(/\s+/).filter((w) => w.length > 1).length;
+  const sentenceCount = (cleanedText.match(/[.!?]+/g) || []).length;
+
+  console.log(
+    `Analyse document: ${characterCount} caractères, ${wordCount} mots, ${sentenceCount} phrases`,
+  );
+
+  // Basé sur le nombre de mots
+  if (wordCount < 300) {
+    // Très court : 5-7 questions
+    return Math.max(5, Math.min(7, Math.floor(wordCount / 50)));
+  } else if (wordCount < 800) {
+    // Court : 8-12 questions
+    return Math.max(8, Math.min(12, Math.floor(wordCount / 70)));
+  } else if (wordCount < 2000) {
+    // Moyen : 10-15 questions
+    return Math.max(10, Math.min(15, Math.floor(wordCount / 100)));
+  } else if (wordCount < 5000) {
+    // Long : 12-20 questions
+    return Math.max(12, Math.min(20, Math.floor(wordCount / 150)));
+  } else {
+    // Très long : 15-25 questions (max)
+    return Math.max(15, Math.min(25, Math.floor(wordCount / 250)));
+  }
+};
 const createPredefinedQuiz = async (req, res) => {
   try {
     const {
@@ -251,6 +423,48 @@ const setPlayerReady = async (req, res) => {
 const endQuiz = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Vérifiez d'abord le statut actuel
+    const quiz = await Quiz.findByPk(id);
+
+    if (!quiz) {
+      return res.status(404).json({
+        success: false,
+        message: "Quiz non trouvé",
+      });
+    }
+
+    // Si le quiz est déjà terminé, retournez quand même les résultats
+    if (quiz.status === "finished") {
+      const participants = await QuizParticipant.findAll({
+        where: { quizId: id },
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["id", "userName", "userPhoto"],
+          },
+        ],
+        order: [
+          ["score", "DESC"],
+          ["lastAnswerAt", "ASC"],
+        ],
+      });
+
+      return res.json({
+        success: true,
+        message: "Quiz déjà terminé - résultats récupérés",
+        finalScores: participants.map((p) => ({
+          userId: p.userId,
+          userName: p.user.userName,
+          userPhoto: p.user.userPhoto,
+          score: p.score,
+          position: p.position || 0,
+        })),
+        winner: participants[0] || null,
+        quizId: quiz.id,
+      });
+    }
 
     const result = await quizService.endQuiz(id, req.user.id);
 

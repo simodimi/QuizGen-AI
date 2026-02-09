@@ -15,7 +15,7 @@ const {
   removeCustomAvatar,
   getDefaultAvatars,
   updateColor,
-} = require("../controllers/userController");
+} = require("../controllers/UserController");
 const {
   uploadProfilePhoto,
   uploadBackground,

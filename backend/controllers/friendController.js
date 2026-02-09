@@ -4,37 +4,28 @@ const { Op } = require("sequelize");
 const sendFriendRequest = async (req, res) => {
   try {
     const requesterId = req.user.id;
-    const { receiverId } = req.body;
+    const { addresseeId } = req.body;
 
-    if (!receiverId) {
-      return res.status(400).json({
-        success: false,
-        message: "Destinataire manquant",
-      });
+    if (!addresseeId) {
+      return res.status(400).json({ message: "Destinataire manquant" });
     }
 
-    if (requesterId === parseInt(receiverId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Action impossible",
-      });
+    if (requesterId === addresseeId) {
+      return res.status(400).json({ message: "Action impossible" });
     }
 
     const requester = await User.findByPk(requesterId);
-    const receiver = await User.findByPk(receiverId);
+    const addressee = await User.findByPk(addresseeId);
 
-    if (!requester || !receiver) {
-      return res.status(404).json({
-        success: false,
-        message: "Utilisateur non trouvé",
-      });
+    if (!requester || !addressee) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
     }
 
     const existingRequest = await Friend.findOne({
       where: {
         [Op.or]: [
-          { requesterId, receiverId },
-          { requesterId: receiverId, receiverId: requesterId },
+          { requesterId, addresseeId },
+          { requesterId: addresseeId, addresseeId: requesterId },
         ],
       },
     });
@@ -42,7 +33,6 @@ const sendFriendRequest = async (req, res) => {
     if (existingRequest) {
       if (existingRequest.status === "attente") {
         return res.status(400).json({
-          success: false,
           message:
             existingRequest.requesterId === requesterId
               ? "Demande déjà envoyée"
@@ -51,10 +41,7 @@ const sendFriendRequest = async (req, res) => {
       }
 
       if (existingRequest.status === "accepter") {
-        return res.status(400).json({
-          success: false,
-          message: "Déjà amis",
-        });
+        return res.status(400).json({ message: "Déjà amis" });
       }
 
       if (existingRequest.status === "refuser") {
@@ -62,12 +49,14 @@ const sendFriendRequest = async (req, res) => {
       }
     }
 
+    // Création
     const request = await Friend.create({
       requesterId,
-      receiverId,
+      addresseeId,
       status: "attente",
     });
 
+    // Récupération avec user
     const requestWithUser = await Friend.findByPk(request.id, {
       include: [
         {
@@ -77,9 +66,8 @@ const sendFriendRequest = async (req, res) => {
         },
       ],
     });
-
     if (global.io) {
-      global.io.to(`user_${receiverId}`).emit("friend_request_received", {
+      global.io.to(`user_${addresseeId}`).emit("friend_request_received", {
         requestId: request.id,
         sender: {
           id: requester.id,
@@ -88,16 +76,16 @@ const sendFriendRequest = async (req, res) => {
         },
       });
     }
+    // 4️ Sécurité : resync global
+    global.io.to(`user_${addresseeId}`).emit("friends_updated");
 
     res.status(201).json({
-      success: true,
       ...requestWithUser.toJSON(),
       message: "Demande d'amitié envoyée",
     });
   } catch (error) {
     console.error("Erreur envoi demande:", error);
     res.status(500).json({
-      success: false,
       message:
         error.name === "SequelizeUniqueConstraintError"
           ? "Relation déjà existante"
@@ -115,7 +103,7 @@ const getSentRequests = async (req, res) => {
       include: [
         {
           model: User,
-          as: "receiver",
+          as: "addressee",
           attributes: ["id", "userName", "userPhoto"],
         },
       ],
@@ -123,13 +111,11 @@ const getSentRequests = async (req, res) => {
     });
 
     res.json({
-      success: true,
       requests,
     });
   } catch (error) {
     console.error("Erreur getSentRequests:", error);
     res.status(500).json({
-      success: false,
       message: "Erreur serveur",
     });
   }
@@ -138,9 +124,8 @@ const getSentRequests = async (req, res) => {
 const getReceivedRequests = async (req, res) => {
   try {
     const userId = req.user.id;
-
     const requests = await Friend.findAll({
-      where: { receiverId: userId, status: "attente" },
+      where: { addresseeId: userId, status: "attente" },
       include: [
         {
           model: User,
@@ -150,15 +135,12 @@ const getReceivedRequests = async (req, res) => {
       ],
       order: [["createdAt", "DESC"]],
     });
-
     res.json({
-      success: true,
       requests,
     });
   } catch (error) {
     console.error("Erreur getReceivedRequests:", error);
     res.status(500).json({
-      success: false,
       message: "Erreur serveur",
     });
   }
@@ -172,7 +154,6 @@ const respondToRequest = async (req, res) => {
 
     if (!["accepter", "refuser"].includes(status)) {
       return res.status(400).json({
-        success: false,
         message: "Statut invalide",
       });
     }
@@ -180,27 +161,24 @@ const respondToRequest = async (req, res) => {
     const request = await Friend.findByPk(requestId, {
       include: [
         { model: User, as: "requester" },
-        { model: User, as: "receiver" },
+        { model: User, as: "addressee" },
       ],
     });
 
     if (!request) {
       return res.status(404).json({
-        success: false,
         message: "Demande introuvable",
       });
     }
 
-    if (request.receiverId !== userId) {
+    if (request.addresseeId !== userId) {
       return res.status(403).json({
-        success: false,
         message: "Accès refusé",
       });
     }
 
     if (request.status !== "attente") {
       return res.status(400).json({
-        success: false,
         message: "Demande déjà traitée",
       });
     }
@@ -213,35 +191,38 @@ const respondToRequest = async (req, res) => {
     }
 
     await request.save();
-
     if (global.io) {
       const userData =
         status === "accepter"
           ? {
-              id: request.receiver.id,
-              name: request.receiver.userName,
-              image: request.receiver.userPhoto,
+              id: request.addressee.id,
+              name: request.addressee.userName,
+              image: request.addressee.userPhoto,
             }
           : null;
 
       global.io
         .to(`user_${request.requesterId}`)
         .emit("friend_request_responded", {
-          responderId: request.receiver.id,
+          responderId: request.addressee.id,
           status,
           user: userData,
         });
+
+      // Également notifier les deux parties pour mise à jour en temps réel
+      global.io
+        .to(`user_${request.requesterId}`)
+        .to(`user_${request.addresseeId}`)
+        .emit("friends_updated");
     }
 
     res.json({
-      success: true,
       ...request.toJSON(),
       message: status === "accepter" ? "Demande acceptée" : "Demande refusée",
     });
   } catch (error) {
     console.error("Erreur réponse:", error);
     res.status(500).json({
-      success: false,
       message: "Erreur serveur",
     });
   }
@@ -256,43 +237,41 @@ const cancelRequest = async (req, res) => {
 
     if (!request) {
       return res.status(404).json({
-        success: false,
         message: "Demande introuvable",
       });
     }
 
     if (request.requesterId !== userId) {
       return res.status(403).json({
-        success: false,
         message: "Accès refusé",
       });
     }
 
     if (request.status !== "attente") {
       return res.status(400).json({
-        success: false,
         message: "Demande déjà traitée",
       });
     }
 
     await request.destroy();
-
     if (global.io) {
       global.io
-        .to(`user_${request.receiverId}`)
+        .to(`user_${request.addresseeId}`)
         .emit("friend_request_cancelled", {
           requestId: request.id,
         });
+      global.io
+        .to(`user_${request.requesterId}`)
+        .to(`user_${request.addresseeId}`)
+        .emit("friends_updated");
     }
 
     res.json({
-      success: true,
       message: "Demande annulée",
     });
   } catch (error) {
     console.error("Erreur cancelRequest:", error);
     res.status(500).json({
-      success: false,
       message: "Erreur serveur",
     });
   }
@@ -305,7 +284,7 @@ const getFriends = async (req, res) => {
     const friendships = await Friend.findAll({
       where: {
         status: "accepter",
-        [Op.or]: [{ requesterId: userId }, { receiverId: userId }],
+        [Op.or]: [{ requesterId: userId }, { addresseeId: userId }],
       },
       include: [
         {
@@ -315,14 +294,14 @@ const getFriends = async (req, res) => {
         },
         {
           model: User,
-          as: "receiver",
+          as: "addressee",
           attributes: ["id", "userName", "userPhoto", "isOnline"],
         },
       ],
     });
 
     const friends = friendships.map((f) => {
-      const friend = f.requesterId === userId ? f.receiver : f.requester;
+      const friend = f.requesterId === userId ? f.addressee : f.requester;
       return {
         friendshipId: f.id,
         friend: {
@@ -336,13 +315,11 @@ const getFriends = async (req, res) => {
     });
 
     res.json({
-      success: true,
       friends,
     });
   } catch (error) {
     console.error("Erreur getFriends:", error);
     res.status(500).json({
-      success: false,
       message: "Erreur serveur",
     });
   }
@@ -357,8 +334,8 @@ const getFriendshipDate = async (req, res) => {
       where: {
         status: "accepter",
         [Op.or]: [
-          { requesterId: userId, receiverId: friendId },
-          { requesterId: friendId, receiverId: userId },
+          { requesterId: userId, addresseeId: friendId },
+          { requesterId: friendId, addresseeId: userId },
         ],
       },
       attributes: ["acceptedAt"],
@@ -366,7 +343,6 @@ const getFriendshipDate = async (req, res) => {
 
     if (!friendship || !friendship.acceptedAt) {
       return res.status(404).json({
-        success: false,
         message: "Amitié non trouvée",
       });
     }
@@ -374,7 +350,6 @@ const getFriendshipDate = async (req, res) => {
     const date = new Date(friendship.acceptedAt);
 
     res.json({
-      success: true,
       acceptedAt: friendship.acceptedAt,
       formattedDate: {
         day: date.getDate(),
@@ -385,7 +360,50 @@ const getFriendshipDate = async (req, res) => {
   } catch (error) {
     console.error("Erreur getFriendshipDate:", error);
     res.status(500).json({
-      success: false,
+      message: "Erreur serveur",
+    });
+  }
+};
+const removeFriend = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { friendId } = req.params;
+
+    const friendship = await Friend.findOne({
+      where: {
+        status: "accepter",
+        [Op.or]: [
+          { requesterId: userId, addresseeId: friendId },
+          { requesterId: friendId, addresseeId: userId },
+        ],
+      },
+    });
+
+    if (!friendship) {
+      return res.status(404).json({
+        message: "Amitié non trouvée",
+      });
+    }
+
+    await friendship.destroy();
+
+    if (global.io) {
+      global.io.to(`user_${userId}`).emit("friendship_removed", { friendId });
+      global.io.to(`user_${friendId}`).emit("friendship_removed", { friendId });
+
+      // Mise à jour globale
+      global.io
+        .to(`user_${userId}`)
+        .to(`user_${friendId}`)
+        .emit("friends_updated");
+    }
+
+    res.json({
+      message: "Ami supprimé",
+    });
+  } catch (error) {
+    console.error("Erreur removeFriend:", error);
+    res.status(500).json({
       message: "Erreur serveur",
     });
   }
@@ -399,4 +417,5 @@ module.exports = {
   cancelRequest,
   getFriends,
   getFriendshipDate,
+  removeFriend,
 };

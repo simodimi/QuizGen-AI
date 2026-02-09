@@ -26,18 +26,18 @@ import Waiting from "./components/layout/Waiting";
 import ConfirmAccount from "./services/ConfirmAccount";
 import { AuthProviderUser } from "./services/AuthContextUser";
 import ProctectRouteUser from "./services/ProctectRouteUser";
+import QuizAutoSolo from "./pages/QuizAutoSolo";
 
 function App() {
-  const [countFriends, setcountFriends] = useState<number>(0);
-  const [passdocument, setpassdocument] = useState<
-    { file: File; createdAt: number }[]
-  >([]);
+  //const [countFriends, setcountFriends] = useState<number>(0);
+
   const [usersend, setusersend] = useState<number | null>(null);
+
   const Layout = () => {
     return (
       <div className="AppHeader">
         <div className="AppHeaderLeft">
-          <Sidebar countFriends={countFriends} />
+          <Sidebar />
         </div>
         <div className="AppHeaderRight">
           <Outlet />
@@ -68,27 +68,14 @@ function App() {
             >
               <Route index element={<Home />} />
               <Route path="quiz/:theme" element={<Quiz />} />
-              <Route
-                path="quiz/autoIA"
-                element={<QuizAuto setpassdocument={setpassdocument} />}
-              />
-              <Route
-                path="ami"
-                element={
-                  <Ami
-                    setcountFriends={setcountFriends}
-                    setusersend={setusersend}
-                  />
-                }
-              />
-              <Route
-                path="document"
-                element={<Document passdocument={passdocument} />}
-              />
+              <Route path="quiz/autoIA" element={<QuizAuto />} />
+              <Route path="ami" element={<Ami setusersend={setusersend} />} />
+              <Route path="document" element={<Document />} />
               <Route path="result" element={<Result />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="parametre" element={<Parametre />} />
               <Route path="message" element={<Message usersend={usersend} />} />
+              <Route path="solo" element={<QuizAutoSolo />} />
             </Route>
           </Routes>
           <Notification />
