@@ -3,7 +3,7 @@ const { ipKeyGenerator } = require("express-rate-limit");
 // Limitation globale pour les requêtes API
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requêtes max par IP
+  max: 200, // 100 requêtes max par IP
   message: {
     message: "Trop de requêtes depuis cette IP, veuillez réessayer plus tard",
   },

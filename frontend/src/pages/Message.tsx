@@ -7,6 +7,7 @@ import logo from "../assets/icone/logo.png";
 import connect from "../services/Util";
 import { useAuth } from "../services/AuthContextUser";
 import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
 
 interface Message {
   id: number;
@@ -58,6 +59,7 @@ const Message = ({ usersend }: AmiProps) => {
   const refslider = useRef<HTMLDivElement | null>(null);
   const { user } = useAuth();
   const currentMessages = selectUser !== null ? userSms[selectUser] || [] : [];
+  const navigate = useNavigate();
 
   // Initialisation Socket.IO
   useEffect(() => {
@@ -541,11 +543,7 @@ const Message = ({ usersend }: AmiProps) => {
     );
   };
 
-  const handleClick = () => {
-    alert("clic sur un lien");
-  };
-
-  const renderMessage = (text: string) => {
+  /*const renderMessage = (text: string) => {
     const regex = /(start\S*quiz-IA)/g;
 
     return text.split("\n").map((line, index, array) => {
@@ -555,11 +553,68 @@ const Message = ({ usersend }: AmiProps) => {
         <div key={index}>
           {parts.map((part, partIndex) => {
             if (regex.test(part)) {
+              // Le lien est déjà dans le format correct: start123quiz-IA
+              const code = part.replace("start", "").replace("quiz-IA", "");
+
               return (
                 <span
                   key={`${index}-${partIndex}`}
                   className="quiz-link"
-                  onClick={handleClick}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    console.log("Lien quiz cliqué:", part, "Code:", code);
+                    navigate(`/home/multi?code=${code}`);
+                    // Afficher un toast pour confirmation
+                    toast.info(`Redirection vers le quiz... Code: ${code}`);
+
+                    // Naviguer vers la page quiz multi
+                    setTimeout(() => {
+                      navigate("/home/multi");
+                    }, 500);
+                  }}
+                >
+                  {part}
+                </span>
+              );
+            }
+            return part;
+          })}
+          {index < array.length - 1 && <br />}
+        </div>
+      );
+    });
+  };*/
+  const renderMessage = (text: string) => {
+    // Regex POUR CAPTURER UNIQUEMENT LE FORMAT startXXXquiz-IA
+    const regex = /(start\S*quiz-IA)/g;
+
+    return text.split("\n").map((line, index, array) => {
+      const parts = line.split(regex);
+
+      return (
+        <div key={index}>
+          {parts.map((part, partIndex) => {
+            // Vérifier si la partie correspond au format startXXXquiz-IA
+            if (part && part.match(/^start.*quiz-IA$/)) {
+              // Extraire le code
+              const code = part.replace("start", "").replace("quiz-IA", "");
+
+              return (
+                <span
+                  key={`${index}-${partIndex}`}
+                  className="quiz-link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    console.log("🔗 Lien quiz cliqué:", part, "Code:", code);
+                    toast.info(`🎮 Redirection vers le quiz...`);
+
+                    // ✅ UNE SEULE NAVIGATION - directe et propre
+                    navigate(`/home/multi?code=${code}`);
+                  }}
                 >
                   {part}
                 </span>
@@ -572,7 +627,6 @@ const Message = ({ usersend }: AmiProps) => {
       );
     });
   };
-
   useEffect(() => {
     if (usersend && friends.length > 0) {
       const foundUser = friends.find((p) => p.id === usersend);

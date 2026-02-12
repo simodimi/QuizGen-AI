@@ -35,8 +35,51 @@ const createQuiz = async (quizData, questions = []) => {
   }
   return quiz;
 };
-const joinQuizByCode = async (inviteCode, userId) => {
+const joinQuizByCode = async (code, userId) => {
   const quiz = await Quiz.findOne({
+    where: { invitationCode: code },
+    include: [
+      {
+        model: User,
+        as: "creator",
+        attributes: ["id", "userName", "userPhoto"],
+      },
+    ],
+  });
+
+  if (!quiz) {
+    throw new Error("Quiz non trouvé");
+  }
+
+  if (quiz.status !== "waiting") {
+    throw new Error("Ce quiz a déjà démarré ou est terminé");
+  }
+
+  // Vérifier si déjà participant
+  let participant = await QuizParticipant.findOne({
+    where: { quizId: quiz.id, userId },
+  });
+
+  if (!participant) {
+    participant = await QuizParticipant.create({
+      quizId: quiz.id,
+      userId,
+      isReady: false,
+      score: 0,
+    });
+  }
+
+  return {
+    quiz: {
+      id: quiz.id,
+      title: quiz.title, // ← ICI AUSSI
+      mode: quiz.mode,
+      questionCount: quiz.questionCount,
+      creator: quiz.creator,
+    },
+    participant,
+  };
+  /*const quiz = await Quiz.findOne({
     where: { invitationCode: inviteCode },
     include: [
       {
@@ -66,7 +109,7 @@ const joinQuizByCode = async (inviteCode, userId) => {
     isReady: false,
     score: 0,
   });
-  return { quiz, participant };
+  return { quiz, participant };*/
 };
 
 const startQuiz = async (quizId, creatorId) => {

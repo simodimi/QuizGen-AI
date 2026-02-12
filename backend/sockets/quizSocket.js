@@ -1,4 +1,4 @@
-const {
+/*const {
   Quiz,
   Question,
   QuizParticipant,
@@ -9,83 +9,90 @@ const {
 const activeQuizzes = new Map();
 
 module.exports = (io, socket) => {
-  // Rejoindre un quiz avec code
-  socket.on("quiz:join", async ({ inviteCode }) => {
+  const userId = socket.handshake.query.userId;
+  if (userId) {
+    socket.userId = parseInt(userId);
+    socket.userName = socket.handshake.query.userName || "Utilisateur";
+  }
+ 
+
+  socket.on("quiz:invite_friends", async ({ quizId, friendIds }) => {
+    try {
+      const quiz = await Quiz.findByPk(quizId);
+      if (!quiz || quiz.creatorId !== socket.userId) return;
+
+      friendIds.forEach((friendId) => {
+        io.to(`user_${friendId}`).emit("quiz:invitation", {
+          quizId,
+          quizTitle: quiz.title,
+          invitationCode: quiz.invitationCode,
+          fromUserId: socket.userId,
+          fromUserName: socket.userName,
+          createdAt: new Date(),
+        });
+      });
+
+      socket.emit("quiz:friends_invited", { count: friendIds.length });
+    } catch (err) {
+      console.error("Erreur quiz:invite_friends", err);
+    }
+  });
+
+
+
+  socket.on("quiz:join_by_code", async ({ invitationCode }) => {
     try {
       const quiz = await Quiz.findOne({
-        where: { invitationCode: inviteCode, status: "waiting" },
+        where: { invitationCode, status: "waiting" },
       });
 
       if (!quiz) {
-        socket.emit("quiz:join_error", {
-          message: "Quiz introuvable ou déjà commencé",
-        });
+        socket.emit("quiz:join_error", { message: "Quiz introuvable" });
         return;
       }
 
-      // Vérifier si déjà participant
+      socket.join(`quiz_${quiz.id}`);
+
       const existing = await QuizParticipant.findOne({
         where: { quizId: quiz.id, userId: socket.userId },
       });
 
-      if (existing) {
-        socket.emit("quiz:join_error", { message: "Vous participez déjà" });
-        return;
-      }
-
-      // Ajouter comme participant
-      const participant = await QuizParticipant.create({
-        quizId: quiz.id,
-        userId: socket.userId,
-        isReady: false,
-        score: 0,
-      });
-
-      // Rejoindre la room du quiz
-      socket.join(`quiz_${quiz.id}`);
-
-      // Récupérer les infos utilisateur
-      const user = await User.findByPk(socket.userId, {
-        attributes: ["id", "userName", "userPhoto"],
-      });
-
-      // Informer tous les participants
-      io.to(`quiz_${quiz.id}`).emit("quiz:player_joined", {
-        userId: socket.userId,
-        userName: user.userName,
-        userPhoto: user.userPhoto,
-        participantId: participant.id,
-        totalParticipants: await QuizParticipant.count({
-          where: { quizId: quiz.id },
-        }),
-      });
-
-      // Informer le créateur spécifiquement
-      if (quiz.creatorId !== socket.userId) {
-        io.to(`user_${quiz.creatorId}`).emit("quiz:new_participant", {
-          userId: socket.userId,
-          userName: user.userName,
+      if (!existing) {
+        await QuizParticipant.create({
           quizId: quiz.id,
-          quizTitle: quiz.title,
+          userId: socket.userId,
+          isReady: false,
+          score: 0,
         });
       }
 
-      socket.emit("quiz:joined", {
-        quizId: quiz.id,
-        title: quiz.title,
-        creatorId: quiz.creatorId,
-        mode: quiz.mode,
-        participantId: participant.id,
+      const participants = await QuizParticipant.findAll({
+        where: { quizId: quiz.id },
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["id", "userName", "userPhoto"],
+          },
+        ],
       });
-    } catch (error) {
-      console.error("Erreur quiz:join:", error);
-      socket.emit("quiz:join_error", { message: "Erreur serveur" });
+
+      io.to(`quiz_${quiz.id}`).emit("quiz:waiting_room_update", {
+        participants,
+        allReady: participants.every((p) => p.isReady),
+      });
+
+      socket.emit("quiz:joined", { quizId: quiz.id, title: quiz.title });
+    } catch (err) {
+      console.error("Erreur quiz:join_by_code", err);
     }
   });
 
-  // Marquer comme prêt
-  socket.on("quiz:ready", async ({ quizId }) => {
+
+  socket.on("quiz:multi_ready", async ({ quizId }) => {
     try {
+      const quiz = await Quiz.findByPk(quizId);
+
       const participant = await QuizParticipant.findOne({
         where: { quizId, userId: socket.userId },
       });
@@ -95,340 +102,216 @@ module.exports = (io, socket) => {
       participant.isReady = true;
       await participant.save();
 
-      // Informer tous les participants
-      io.to(`quiz_${quizId}`).emit("quiz:player_ready", {
-        userId: socket.userId,
-        isReady: true,
+      const participants = await QuizParticipant.findAll({
+        where: { quizId },
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["id", "userName", "userPhoto"],
+          },
+        ],
       });
 
-      // Vérifier si tous sont prêts
-      const notReadyCount = await QuizParticipant.count({
-        where: { quizId, isReady: false },
+      const allReady = participants.every((p) => p.isReady);
+
+      io.to(`quiz_${quizId}`).emit("quiz:waiting_room_update", {
+        participants,
+        allReady,
       });
 
-      if (notReadyCount === 0) {
-        io.to(`quiz_${quizId}`).emit("quiz:all_ready", { quizId });
-        io.to(`user_${socket.userId}`).emit("quiz:can_start", { quizId });
+      if (allReady) {
+        io.to(`user_${quiz.creatorId}`).emit("quiz:can_start", {
+          quizId,
+          canStart: true,
+        });
       }
-    } catch (error) {
-      console.error("Erreur quiz:ready:", error);
+    } catch (err) {
+      console.error("Erreur quiz:multi_ready", err);
     }
   });
 
-  // Lancer le quiz (créateur uniquement)
-  socket.on("quiz:start", async ({ quizId }) => {
+
+  socket.on("quiz:multi_start", async ({ quizId }) => {
     try {
-      const quiz = await Quiz.findByPk(quizId);
+      socket.join(`quiz_${quizId}`);
 
-      if (!quiz || quiz.creatorId !== socket.userId) {
-        socket.emit("quiz:start_error", { message: "Accès refusé" });
+      const quiz = await Quiz.findByPk(quizId, {
+        include: [
+          { model: Question, as: "questions", order: [["order", "ASC"]] },
+        ],
+      });
+
+      if (!quiz || quiz.creatorId !== socket.userId) return;
+
+      const notReady = await QuizParticipant.count({
+        where: { quizId, isReady: false },
+      });
+
+      if (notReady > 0) {
+        socket.emit("quiz:start_error", {
+          message: "Tous les participants ne sont pas prêts",
+        });
         return;
       }
 
-      if (quiz.status !== "waiting") {
-        socket.emit("quiz:start_error", { message: "Quiz déjà démarré" });
-        return;
-      }
-
-      // Récupérer les questions
-      const questions = await Question.findAll({
-        where: { quizId },
-        order: [["order", "ASC"]],
-      });
-
-      // Initialiser l'état du quiz
-      activeQuizzes.set(quizId, {
-        questions,
-        currentQuestionIndex: 0,
-        participants: new Map(),
-        timers: new Map(),
-      });
-
-      // Mettre à jour le statut
       quiz.status = "running";
       quiz.startedAt = new Date();
       quiz.currentQuestionIndex = 0;
       await quiz.save();
 
-      // Envoyer la première question
-      const firstQuestion = questions[0];
-      io.to(`quiz_${quizId}`).emit("quiz:question", {
-        questionId: firstQuestion.id,
-        text: firstQuestion.text,
-        type: firstQuestion.type,
-        choices: firstQuestion.choices || [],
-        order: firstQuestion.order,
-        totalQuestions: questions.length,
-        timeLimit: firstQuestion.timeLimit || 40,
-        questionIndex: 1,
+      const questions = quiz.questions.map((q) => ({
+        id: q.id,
+        text: q.text,
+        type: q.type,
+        choices: q.choices || [],
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+        points: q.points || 1,
+        timeLimit: q.timeLimit || 40,
+      }));
+
+      activeQuizzes.set(quizId, {
+        questions,
+        currentQuestionIndex: 0,
+        participants: new Map(),
+        answers: new Map(),
+        timers: new Map(),
+        startTime: Date.now(),
       });
 
-      // Démarrer le timer
-      startQuestionTimer(
-        io,
-        quizId,
-        firstQuestion.id,
-        firstQuestion.timeLimit || 40,
-      );
-    } catch (error) {
-      console.error("Erreur quiz:start:", error);
-      socket.emit("quiz:start_error", { message: "Erreur serveur" });
+      io.to(`quiz_${quizId}`).emit("quiz:question_start", {
+        question: questions[0],
+        questionNumber: 1,
+        totalQuestions: questions.length,
+        timeLimit: questions[0].timeLimit,
+      });
+
+      startQuestionTimer(io, quizId, questions[0].id, questions[0].timeLimit);
+    } catch (err) {
+      console.error("Erreur quiz:multi_start", err);
     }
   });
 
-  // Soumettre une réponse
-  socket.on(
-    "quiz:answer",
-    async ({ quizId, questionId, answer, timeSpent }) => {
-      try {
-        const quizState = activeQuizzes.get(quizId);
-        if (!quizState) return;
 
-        const question = quizState.questions[quizState.currentQuestionIndex];
-        if (!question || question.id !== questionId) return;
 
-        // Vérifier la réponse
-        let isCorrect = false;
-
-        if (question.type === "qcm" || question.type === "multiple") {
-          const correctAnswers = Array.isArray(question.correctAnswer)
-            ? question.correctAnswer
-            : [question.correctAnswer];
-
-          const userAnswers = Array.isArray(answer) ? answer : [answer];
-
-          isCorrect =
-            correctAnswers.every((ca) => userAnswers.includes(ca)) &&
-            correctAnswers.length === userAnswers.length;
-        }
-
-        // Calculer le score
-        const basePoints = question.points || 1;
-        //const timeBonus = timeSpent < 10 ? 0.5 : 0;
-        scoreEarned = isCorrect ? basePoints /*+ timeBonus*/ : 0;
-
-        // Mettre à jour l'état
-        if (!quizState.participants.has(socket.userId)) {
-          quizState.participants.set(socket.userId, { score: 0, totalTime: 0 });
-        }
-
-        const participant = quizState.participants.get(socket.userId);
-        if (isCorrect) {
-          participant.score += scoreEarned;
-          participant.totalTime += timeSpent;
-        }
-
-        // Enregistrer en base
-        await QuizAnswer.create({
-          quizId,
-          questionId,
-          userId: socket.userId,
-          answer,
-          isCorrect,
-          timeSpent,
-          score: scoreEarned,
-          answeredAt: new Date(),
-        });
-
-        // Mettre à jour le participant
-        await QuizParticipant.update(
-          {
-            score: participant.score,
-            lastAnswerAt: new Date(),
-          },
-          { where: { quizId, userId: socket.userId } },
-        );
-
-        // Informer l'utilisateur
-        socket.emit("quiz:answer_result", {
-          questionId,
-          isCorrect,
-          scoreEarned,
-          totalScore: participant.score,
-        });
-
-        // Vérifier si tous ont répondu
-        const totalParticipants = await QuizParticipant.count({
-          where: { quizId },
-        });
-        const answeredCount = Array.from(quizState.participants.keys()).length;
-
-        if (answeredCount >= totalParticipants) {
-          // Tous ont répondu, passer à la question suivante
-          await nextQuestion(io, quizId);
-        }
-      } catch (error) {
-        console.error("Erreur quiz:answer:", error);
-      }
-    },
-  );
-
-  // Inviter un ami à un quiz
-  socket.on("quiz:invite", async ({ quizId, friendId }) => {
+  socket.on("quiz:multi_answer", async ({ quizId, questionId, answer }) => {
     try {
-      const quiz = await Quiz.findByPk(quizId);
+      const quizState = activeQuizzes.get(quizId);
+      if (!quizState) return;
 
-      if (!quiz || quiz.creatorId !== socket.userId) {
-        socket.emit("quiz:invite_error", { message: "Accès refusé" });
-        return;
+      const question = quizState.questions[quizState.currentQuestionIndex];
+      if (!question || question.id !== questionId) return;
+
+      const timeSpent = Math.floor((Date.now() - quizState.startTime) / 1000);
+
+      quizState.answers.set(socket.userId, { answer, timeSpent });
+
+      const participants = await QuizParticipant.findAll({ where: { quizId } });
+
+      if (quizState.answers.size >= participants.length) {
+        await evaluateAnswers(io, quizId, quizState);
       }
-
-      // Vérifier l'amitié
-      const friendship = await require("../models").Friend.findOne({
-        where: {
-          status: "accepter",
-          [require("sequelize").Op.or]: [
-            { requesterId: socket.userId, receiverId: friendId },
-            { requesterId: friendId, receiverId: socket.userId },
-          ],
-        },
-      });
-
-      if (!friendship) {
-        socket.emit("quiz:invite_error", { message: "Vous n'êtes pas amis" });
-        return;
-      }
-
-      // Envoyer l'invitation
-      io.to(`user_${friendId}`).emit("quiz:invitation", {
-        quizId,
-        quizTitle: quiz.title,
-        invitationCode: quiz.invitationCode,
-        fromUserId: socket.userId,
-        fromUserName: socket.userName,
-        createdAt: new Date(),
-      });
-
-      socket.emit("quiz:invite_sent", { friendId });
-    } catch (error) {
-      console.error("Erreur quiz:invite:", error);
-      socket.emit("quiz:invite_error", { message: "Erreur serveur" });
+      if (quizState.answers.has(socket.userId)) return;
+    } catch (err) {
+      console.error("Erreur quiz:multi_answer", err);
     }
   });
 };
 
+
 function startQuestionTimer(io, quizId, questionId, duration) {
   const timer = setTimeout(async () => {
-    await nextQuestion(io, quizId);
+    const quizState = activeQuizzes.get(quizId);
+    if (!quizState) return;
+
+    await evaluateAnswers(io, quizId, quizState);
+
+    io.to(`quiz_${quizId}`).emit("quiz:time_up", { questionId });
   }, duration * 1000);
 
   const quizState = activeQuizzes.get(quizId);
-  if (quizState) {
-    quizState.timers.set(`question_${questionId}`, timer);
-  }
+  if (quizState) quizState.timers.set(`question_${questionId}`, timer);
 }
 
-async function nextQuestion(io, quizId) {
-  const quizState = activeQuizzes.get(quizId);
-  if (!quizState) return;
 
-  // Annuler le timer actuel
-  const currentQuestion = quizState.questions[quizState.currentQuestionIndex];
-  if (currentQuestion) {
-    const timerKey = `question_${currentQuestion.id}`;
-    if (quizState.timers.has(timerKey)) {
-      clearTimeout(quizState.timers.get(timerKey));
-      quizState.timers.delete(timerKey);
+async function evaluateAnswers(io, quizId, quizState) {
+  const question = quizState.questions[quizState.currentQuestionIndex];
+
+  const participants = await QuizParticipant.findAll({
+    where: { quizId },
+    include: [
+      { model: User, as: "user", attributes: ["id", "userName", "userPhoto"] },
+    ],
+  });
+
+  const results = [];
+
+  for (const participant of participants) {
+    const userAnswer = quizState.answers.get(participant.userId);
+    let isCorrect = false;
+
+    if (userAnswer) {
+      if (question.type === "qcm") {
+        isCorrect = userAnswer.answer === question.correctAnswer;
+      } else if (question.type === "multiple") {
+        const ua = Array.isArray(userAnswer.answer)
+          ? userAnswer.answer
+          : [userAnswer.answer];
+        const ca = Array.isArray(question.correctAnswer)
+          ? question.correctAnswer
+          : [question.correctAnswer];
+        isCorrect = ua.length === ca.length && ua.every((v) => ca.includes(v));
+      }
+
+      const score = isCorrect ? question.points : 0;
+
+      participant.score += score;
+      participant.lastAnswerAt = new Date();
+      await participant.save();
+
+      results.push({
+        userId: participant.userId,
+        userName: participant.user.userName,
+        userPhoto: participant.user.userPhoto,
+        isCorrect,
+        scoreEarned: score,
+        totalScore: participant.score,
+        timeSpent: userAnswer.timeSpent,
+      });
     }
   }
 
-  quizState.currentQuestionIndex++;
+  results.sort(
+    (a, b) => b.totalScore - a.totalScore || a.timeSpent - b.timeSpent,
+  );
 
-  // Envoyer le classement intermédiaire
-  const leaderboard = Array.from(quizState.participants.entries())
-    .map(([userId, data]) => ({ userId, ...data }))
-    .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return a.totalTime - b.totalTime;
-    });
-
-  io.to(`quiz_${quizId}`).emit("quiz:leaderboard", {
-    leaderboard,
-    questionIndex: quizState.currentQuestionIndex,
+  io.to(`quiz_${quizId}`).emit("quiz:question_results", {
+    questionId: question.id,
+    correctAnswer: question.correctAnswer,
+    explanation: question.explanation,
+    leaderboard: results,
   });
 
-  // Vérifier si c'est la fin du quiz
+  quizState.currentQuestionIndex++;
+  quizState.answers.clear();
+  quizState.startTime = Date.now();
+
   if (quizState.currentQuestionIndex >= quizState.questions.length) {
-    // Fin du quiz
-    await endQuiz(io, quizId, quizState);
+    io.to(`quiz_${quizId}`).emit("quiz:ended", { leaderboard: results });
     activeQuizzes.delete(quizId);
     return;
   }
 
-  // Envoyer la question suivante
   const nextQuestion = quizState.questions[quizState.currentQuestionIndex];
-  io.to(`quiz_${quizId}`).emit("quiz:question", {
-    questionId: nextQuestion.id,
-    text: nextQuestion.text,
-    type: nextQuestion.type,
-    choices: nextQuestion.choices || [],
-    order: nextQuestion.order,
+
+  io.to(`quiz_${quizId}`).emit("quiz:question_start", {
+    question: nextQuestion,
+    questionNumber: quizState.currentQuestionIndex + 1,
     totalQuestions: quizState.questions.length,
-    timeLimit: nextQuestion.timeLimit || 40,
-    questionIndex: quizState.currentQuestionIndex + 1,
+    timeLimit: nextQuestion.timeLimit,
   });
 
-  // Démarrer le timer pour la nouvelle question
-  startQuestionTimer(io, quizId, nextQuestion.id, nextQuestion.timeLimit || 40);
+  startQuestionTimer(io, quizId, nextQuestion.id, nextQuestion.timeLimit);
 }
-
-async function endQuiz(io, quizId, quizState) {
-  try {
-    const quiz = await Quiz.findByPk(quizId);
-
-    // Mettre à jour le quiz
-    quiz.status = "finished";
-    quiz.finishedAt = new Date();
-    quiz.currentQuestionIndex = quizState.questions.length;
-    await quiz.save();
-
-    // Calculer le classement final
-    const finalParticipants = await QuizParticipant.findAll({
-      where: { quizId },
-      include: [
-        {
-          model: User,
-          as: "user",
-          attributes: ["id", "userName", "userPhoto"],
-        },
-      ],
-      order: [
-        ["score", "DESC"],
-        ["lastAnswerAt", "ASC"],
-      ],
-    });
-
-    // Mettre à jour les positions
-    for (let i = 0; i < finalParticipants.length; i++) {
-      finalParticipants[i].position = i + 1;
-      await finalParticipants[i].save();
-    }
-
-    const finalLeaderboard = finalParticipants.map((p) => ({
-      userId: p.userId,
-      userName: p.user.userName,
-      userPhoto: p.user.userPhoto,
-      score: p.score,
-      position: p.position,
-      isReady: p.isReady,
-    }));
-
-    // Envoyer les résultats finaux
-    io.to(`quiz_${quizId}`).emit("quiz:end", {
-      quizId,
-      leaderboard: finalLeaderboard,
-      winner: finalLeaderboard[0],
-      finishedAt: quiz.finishedAt,
-    });
-
-    // Mettre à jour la progression des utilisateurs
-    for (const participant of finalParticipants) {
-      await require("../services/quizService").updateUserProgress(
-        participant.userId,
-        participant.score,
-      );
-    }
-  } catch (error) {
-    console.error("Erreur endQuiz:", error);
-  }
-}
+*/

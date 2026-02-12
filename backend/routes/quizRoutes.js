@@ -11,6 +11,7 @@ const {
   getNextQuestion,
   getUserQuizzes,
   cancelQuiz,
+  detailQuiz,
 } = require("../controllers/quizController");
 
 // Génération de quiz
@@ -25,6 +26,7 @@ router.post("/:id/ready", setPlayerReady);
 router.post("/:id/end", endQuiz);
 router.get("/:id/next-question", getNextQuestion);
 router.delete("/:id", cancelQuiz);
+router.get("/details/:code", detailQuiz);
 
 // Quiz de l'utilisateur
 router.get("/user/all", getUserQuizzes);

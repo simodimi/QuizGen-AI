@@ -130,60 +130,9 @@ const io = new Server(server, {
   pingInterval: 25000,
 });
 
+// UNE SEULE déclaration de onlineUsers
 const onlineUsers = new Map();
 
-/*io.on("connection", (socket) => {
-  console.log(`Nouvelle connexion Socket.IO: ${socket.id}`);
-
-  const userId = socket.handshake.query.userId;
-
-  if (userId) {
-    onlineUsers.set(userId, socket.id);
-    console.log(`Utilisateur ${userId} en ligne (socket: ${socket.id})`);
-
-    io.emit("user_online", userId);
-
-    // Rejoindre la room utilisateur
-    socket.join(`user_${userId}`);
-  }
-
-  socket.on("get_online_users", () => {
-    socket.emit("online_users", [...onlineUsers.keys()]);
-  });
-
-  socket.on("join_user_room", (userId) => {
-    if (!userId) return;
-    socket.join(`user_${userId}`);
-    console.log(`Socket ${socket.id} rejoint user_${userId}`);
-  });
-
-  socket.on("join_friends_room", () => {
-    socket.join("friends_room");
-    console.log(`Socket ${socket.id} rejoint friends_room`);
-  });
-
-  socket.on("leave_friends_room", () => {
-    socket.leave("friends_room");
-    console.log(`Socket ${socket.id} quitte friends_room`);
-  });
-
-  socket.on("disconnect", () => {
-    console.log(`Déconnexion Socket.IO: ${socket.id}`);
-
-    for (const [id, sId] of onlineUsers.entries()) {
-      if (sId === socket.id) {
-        onlineUsers.delete(id);
-        io.emit("user_offline", id);
-        console.log(`Utilisateur ${id} hors ligne`);
-        break;
-      }
-    }
-  });
-
-  socket.on("error", (error) => {
-    console.error("Erreur Socket.IO:", error);
-  });
-});*/
 io.on("connection", (socket) => {
   console.log(`Nouvelle connexion Socket.IO: ${socket.id}`);
 
@@ -261,10 +210,13 @@ io.on("connection", (socket) => {
     console.error("Erreur Socket.IO:", error);
   });
 });
+
 const {
   setupMessageSocketHandlers,
 } = require("./controllers/messageController");
 setupMessageSocketHandlers(io);
+const { setupQuizSocketHandlers } = require("./sockets/quizSocketHandlers");
+setupQuizSocketHandlers(io);
 // Export io globalement
 global.io = io;
 

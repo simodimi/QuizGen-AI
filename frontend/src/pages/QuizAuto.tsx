@@ -91,16 +91,39 @@ const QuizAuto = () => {
       const res = await connect.post("/api/documents/", formdata);
       if (res.status === 201) {
         console.log("Document envoyé avec succès");
-        // Stocker les infos du document dans localStorage
-        localStorage.setItem(
-          "lastUploadedDocument",
-          JSON.stringify({
-            id: res.data.document.id,
+
+        // ✅ STOCKER DANS LE STATE, PAS DANS LOCALSTORAGE
+        // Naviguer vers la page QuizAutoSolo avec le documentId
+        navigate("/home/solo", {
+          state: {
+            documentId: res.data.document.id,
             fileName: res.data.document.fileName,
-          }),
-        );
-        // Naviguer vers la page QuizAutoSolo
-        navigate("/home/solo");
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'envoi du document:", error);
+    }
+  };
+  const handlemultiplay = async () => {
+    if (!storefile) {
+      return;
+    }
+    // TODO: Remplacez ceci par la vraie liste d'amis sélectionnés
+    const selectedFriends: Array<{ id: string; name: string }> = [];
+    try {
+      const formdata = new FormData();
+      formdata.append("file", storefile);
+      const res = await connect.post("/api/documents/", formdata);
+      if (res.status === 201) {
+        console.log("Document envoyé avec succès");
+
+        navigate("/home/multi", {
+          state: {
+            documentId: res.data.document.id,
+            fileName: res.data.document.fileName,
+          },
+        });
       }
     } catch (error) {
       console.error("Erreur lors de l'envoi du document:", error);
@@ -139,7 +162,9 @@ const QuizAuto = () => {
                 <div className="">cliquez ici pour ajouter un fichier</div>
               )}
               {isLoading && <p>chargement...</p>}
-              {fileName && !isLoading && <p>{fileName}</p>}
+              {fileName && !isLoading && (
+                <p className="text-center">{fileName}</p>
+              )}
             </span>
             <input
               type="file"
@@ -170,7 +195,9 @@ const QuizAuto = () => {
             <Button className="retour" onClick={handlesoloplay}>
               Jouer en mode solo
             </Button>
-            <Button className="accept">Jouer en mode multi</Button>
+            <Button className="accept" onClick={handlemultiplay}>
+              Jouer en mode multi
+            </Button>
           </div>
         </div>
       )}

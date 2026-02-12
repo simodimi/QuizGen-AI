@@ -27,6 +27,7 @@ import ConfirmAccount from "./services/ConfirmAccount";
 import { AuthProviderUser } from "./services/AuthContextUser";
 import ProctectRouteUser from "./services/ProctectRouteUser";
 import QuizAutoSolo from "./pages/QuizAutoSolo";
+import QuizAutoMulti from "./pages/QuizAutoMulti";
 
 function App() {
   //const [countFriends, setcountFriends] = useState<number>(0);
@@ -76,6 +77,7 @@ function App() {
               <Route path="parametre" element={<Parametre />} />
               <Route path="message" element={<Message usersend={usersend} />} />
               <Route path="solo" element={<QuizAutoSolo />} />
+              <Route path="multi" element={<QuizAutoMulti />} />
             </Route>
           </Routes>
           <Notification />
