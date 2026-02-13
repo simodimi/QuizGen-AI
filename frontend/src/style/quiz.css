@@ -97,6 +97,17 @@
   text-align: center;
   width: 100%;
   max-width: 300px;
+
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 15px;
+
+  overflow-wrap: anywhere;
+}
+.HeaderQuizOptionBtn > * {
+  display: flex;
 }
 .Quizbtn.accept {
   background-color: #4caf50 !important;

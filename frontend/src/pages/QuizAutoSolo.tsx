@@ -132,15 +132,6 @@ const QuizAutoSolo = () => {
     generateQuizFromDocument();
   }, [generateQuizFromDocument]);
 
-  /* const handleSelectAvatar = () => {
-    const picture = Avatar[Math.floor(Math.random() * Avatar.length)];
-    if (picture) {
-      setAvatar(picture.avatar);
-    } else {
-      setAvatar(a1);
-    }
-  };*/
-
   const playSound = (src: string) => {
     const audio = new Audio(src);
     audio.play();
@@ -292,16 +283,6 @@ const QuizAutoSolo = () => {
     }
   };
 
-  /*const handleRestart = () => {
-    setCurrentQuestionIndex(0);
-    setSelectedAnswer(null);
-    setScore(0);
-    setUserAnswers([]);
-    setShowResults(false);
-    setIsAnswerSubmitted(false);
-    setShowProfilMessage(false);
-    generateQuizFromDocument();
-  };*/
   const handleRestart = async () => {
     try {
       // Réinitialiser l'état

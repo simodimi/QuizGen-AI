@@ -399,6 +399,22 @@ const joinQuizByCode = async (req, res) => {
       mode: result.quiz.mode,
       participantId: result.participant.id,
     });
+    const participants = await QuizParticipant.findAll({
+      where: { quizId: result.quiz.id },
+      include: [{ model: User, as: "user" }],
+    });
+
+    if (global.io) {
+      global.io.to(`quiz_${result.quiz.id}`).emit("quiz:participants_update", {
+        participants: participants.map((p) => ({
+          userId: p.userId,
+          userName: p.user.userName,
+          userPhoto: p.user.userPhoto || "/default-avatar.png",
+          isReady: p.isReady,
+          score: p.score || 0,
+        })),
+      });
+    }
   } catch (error) {
     console.error("Erreur rejoindre quiz:", error);
     res.status(400).json({
