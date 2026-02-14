@@ -55,61 +55,31 @@ const joinQuizByCode = async (code, userId) => {
     throw new Error("Ce quiz a déjà démarré ou est terminé");
   }
 
-  // Vérifier si déjà participant
-  let participant = await QuizParticipant.findOne({
-    where: { quizId: quiz.id, userId },
-  });
-
-  if (!participant) {
-    participant = await QuizParticipant.create({
+  // NOUVEAU CODE : findOrCreate au lieu de findOne + create
+  const [participant, created] = await QuizParticipant.findOrCreate({
+    where: {
       quizId: quiz.id,
-      userId,
+      userId: userId,
+    },
+    defaults: {
+      quizId: quiz.id,
+      userId: userId,
       isReady: false,
       score: 0,
-    });
-  }
+      joinedAt: new Date(),
+    },
+  });
 
   return {
     quiz: {
       id: quiz.id,
-      title: quiz.title, // ← ICI AUSSI
+      title: quiz.title,
       mode: quiz.mode,
       questionCount: quiz.questionCount,
       creator: quiz.creator,
     },
     participant,
   };
-  /*const quiz = await Quiz.findOne({
-    where: { invitationCode: inviteCode },
-    include: [
-      {
-        model: User,
-        as: "creator",
-        attributes: ["id", "userName", "userPhoto"],
-      },
-    ],
-  });
-  if (!quiz) {
-    throw new Error("Quiz introuvable");
-  }
-  if (quiz.status !== "waiting") {
-    throw new Error("Le quiz a déjà commencé");
-  }
-  // Vérifier si l'utilisateur est déjà participant
-  const existing = await QuizParticipant.findOne({
-    where: { quizId: quiz.id, userId },
-  });
-  if (existing) {
-    throw new Error("Vous participez déjà à ce quiz");
-  }
-  // Ajouter comme participant
-  const participant = await QuizParticipant.create({
-    quizId: quiz.id,
-    userId,
-    isReady: false,
-    score: 0,
-  });
-  return { quiz, participant };*/
 };
 
 const startQuiz = async (quizId, creatorId) => {

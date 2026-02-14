@@ -10,7 +10,10 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContentText from "@mui/material/DialogContentText";
 import { toast } from "react-toastify";
 import Button from "../components/ui/Button";
-
+import img1 from "../assets/icone/un.png";
+import img2 from "../assets/icone/deux.png";
+import img3 from "../assets/icone/trois.png";
+import img4 from "../assets/icone/oth.png";
 interface Friend {
   id: number;
   name: string;
@@ -100,6 +103,15 @@ const QuizAutoMulti: React.FC = () => {
 
   // Références
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [userAnswers, setUserAnswers] = useState<
+    Array<{
+      questionId: number;
+      answer: string | string[] | null;
+      isCorrect: boolean;
+      correctAnswer: string | string[];
+      explanation: string;
+    }>
+  >([]);
 
   // ✅ Récupérer le documentId depuis le state de navigation
   useEffect(() => {
@@ -235,7 +247,7 @@ const QuizAutoMulti: React.FC = () => {
       toast.info(`Question ${data.questionNumber}/${data.totalQuestions}`);
     });
 
-    // 📌 RÉSULTAT INDIVIDUEL DE LA RÉPONSE
+    /* // 📌 RÉSULTAT INDIVIDUEL DE LA RÉPONSE
     newSocket.on("quiz:answer_result", (data) => {
       console.log("🎯 Résultat réponse:", data);
       toast.success(
@@ -243,6 +255,37 @@ const QuizAutoMulti: React.FC = () => {
           ? `✅ Bonne réponse ! +${data.scoreEarned} points`
           : `❌ Mauvaise réponse.`,
       );
+    });*/
+    // Dans le useEffect du socket, modifiez le handler quiz:answer_result
+    newSocket.on("quiz:answer_result", (data) => {
+      console.log("🎯 Résultat réponse:", data);
+      toast.success(
+        data.isCorrect
+          ? `✅ Bonne réponse ! +${data.scoreEarned} points`
+          : `❌ Mauvaise réponse.`,
+      );
+
+      // ✅ AJOUT: Enregistrer la réponse de l'utilisateur
+      if (currentQuestion) {
+        setUserAnswers((prev) => {
+          // Éviter les doublons
+          const existing = prev.find(
+            (a) => a.questionId === currentQuestion.id,
+          );
+          if (existing) return prev;
+
+          return [
+            ...prev,
+            {
+              questionId: currentQuestion.id,
+              answer: selectedAnswer,
+              isCorrect: data.isCorrect,
+              correctAnswer: data.correctAnswer,
+              explanation: data.explanation,
+            },
+          ];
+        });
+      }
     });
 
     // 📌 MISE À JOUR DU CLASSEMENT EN DIRECT
@@ -268,6 +311,9 @@ const QuizAutoMulti: React.FC = () => {
       setCorrectAnswer(data.correctAnswer);
       setExplanation(data.explanation);
       setLeaderboard(data.leaderboard);
+      if (data.autoTriggered) {
+        toast.info("⏰ Temps écoulé ! Voici la correction.");
+      }
     });
 
     // 📌 TEMPS ÉCOULÉ
@@ -799,21 +845,40 @@ const QuizAutoMulti: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ CORRECTION AUTOMATIQUE - SANS BOUTON */}
-          {showCorrection && (
-            <div className="correction-section">
-              <h3>✅ Correction</h3>
-              <div className="correct-answer">
-                <strong>Réponse correcte:</strong>{" "}
-                {Array.isArray(correctAnswer)
-                  ? correctAnswer.join(", ")
-                  : correctAnswer}
-              </div>
-              {explanation && (
-                <div className="explanation">
+          {showCorrection && currentQuestion && (
+            <div className="AnswerFeedback">
+              <div
+                className={`FeedbackBox ${(() => {
+                  // Déterminer si la réponse de l'utilisateur était correcte
+                  // Utiliser les données reçues via le socket
+                  const isAnswerCorrect = correctAnswer === selectedAnswer; // Simplifié, à adapter pour les choix multiples
+                  return isAnswerCorrect ? "correct" : "incorrect";
+                })()}`}
+              >
+                <h3>
+                  {(() => {
+                    const isAnswerCorrect = correctAnswer === selectedAnswer;
+                    return isAnswerCorrect ? "✅ Correct!" : "❌ Incorrect";
+                  })()}
+                </h3>
+                <p>
                   <strong>Explication:</strong> {explanation}
-                </div>
-              )}
+                </p>
+                {(() => {
+                  const isAnswerCorrect = correctAnswer === selectedAnswer;
+                  if (!isAnswerCorrect) {
+                    return (
+                      <p>
+                        <strong>Bonne réponse:</strong>{" "}
+                        {Array.isArray(correctAnswer)
+                          ? correctAnswer.join(", ")
+                          : correctAnswer}
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
             </div>
           )}
         </div>
@@ -832,24 +897,22 @@ const QuizAutoMulti: React.FC = () => {
 
           {/* ✅ SEULEMENT UN BOUTON SUIVANT POUR LE CRÉATEUR */}
           {isCreator && showCorrection && (
-            <Button
-              className="next-btn"
-              onClick={nextQuestion}
-              style={{ background: "#2196f3" }}
-            >
-              ⏩ Question suivante
+            <Button className="accept" onClick={nextQuestion}>
+              {currentQuestionIndex < totalQuestions
+                ? "Question suivante"
+                : "Voir les résultats"}
             </Button>
           )}
 
           {isAnswerSubmitted && !showCorrection && (
             <div className="waiting-next">
-              <p>✅ Réponse soumise! En attente de la correction...</p>
+              <p>✅ Réponse soumise! En attente de fin du temps {timeLeft}</p>
             </div>
           )}
         </div>
 
         {/* CLASSEMENT EN DIRECT */}
-        {leaderboard.length > 0 && (
+        {leaderboard.length > 0 && showCorrection && (
           <div className="live-leaderboard">
             <h3>🏆 Classement</h3>
             <div className="leaderboard-list">
@@ -881,7 +944,9 @@ const QuizAutoMulti: React.FC = () => {
 
       {leaderboard[0] && (
         <div className="winner-section">
-          <div className="winner-crown">👑</div>
+          <div className="winner-crown">
+            <img src={img1} alt="Couronne de gagnant" />
+          </div>
           <img
             src={leaderboard[0].userPhoto}
             alt={leaderboard[0].userName}
@@ -897,10 +962,21 @@ const QuizAutoMulti: React.FC = () => {
         <h3>Classement Final</h3>
         <div className="leaderboard-final">
           {leaderboard.map((player, index) => {
-            let medal = "";
-            if (index === 0) medal = "🥇";
-            else if (index === 1) medal = "🥈";
-            else if (index === 2) medal = "🥉";
+            let medal = null;
+            let rank = true;
+            if (index === 0) {
+              medal = <img src={img1} alt="" />;
+              rank = false;
+            } else if (index === 1) {
+              medal = <img src={img2} alt="" />;
+              rank = false;
+            } else if (index === 2) {
+              medal = <img src={img3} alt="" />;
+              rank = false;
+            } else {
+              medal = <img src={img4} alt="" />;
+              rank = true;
+            }
 
             return (
               <div
@@ -908,7 +984,13 @@ const QuizAutoMulti: React.FC = () => {
                 className={`final-item ${player.userId === user?.id ? "highlight" : ""}`}
               >
                 <div className="final-position">
-                  {medal} #{index + 1}
+                  {medal}
+                  {rank && (
+                    <span className="rank-number">
+                      {index + 1}
+                      <sup>e</sup>
+                    </span>
+                  )}
                 </div>
                 <img src={player.userPhoto} alt={player.userName} />
                 <div className="final-info">

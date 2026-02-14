@@ -835,7 +835,7 @@
 .game-actions {
   display: flex;
   justify-content: center;
-  margin: 30px 0;
+  margin: 30px 0 0 0;
 }
 
 .submit-btn {
@@ -934,8 +934,7 @@
   background: #333;
   color: white;
   border-radius: 10px;
-  padding: 20px;
-  margin-top: 30px;
+  padding: 0px 20px;
 }
 
 .leaderboard-list {
@@ -961,6 +960,7 @@
   font-weight: bold;
   margin-right: 15px;
   min-width: 40px;
+  color: black;
 }
 
 .leaderboard-item img {
@@ -976,6 +976,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  color: black;
 }
 
 .player-info .name {
@@ -1009,10 +1010,13 @@
 }
 
 .winner-crown {
-  font-size: 4rem;
-  margin-bottom: 20px;
+  display: flex;
+  justify-content: center;
 }
-
+.winner-crown img {
+  width: 100px;
+  height: 100px;
+}
 .winner-avatar {
   width: 120px;
   height: 120px;
@@ -1062,9 +1066,26 @@
   font-size: 1.3rem;
   font-weight: bold;
   margin-right: 20px;
-  min-width: 80px;
+  width: 50px;
+  text-align: center;
+  position: relative;
 }
 
+.rank-number {
+  display: flex;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.rank-number sup {
+  position: absolute;
+  display: flex;
+  position: absolute;
+  top: 20%;
+  right: -60%;
+  transform: translate(-00%, -50%);
+}
 .final-item img {
   width: 50px;
   height: 50px;
@@ -1188,7 +1209,6 @@
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 15px;
   margin: 20px 0;
-  background-color: yellow;
 }
 
 .participant-card {

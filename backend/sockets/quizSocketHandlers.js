@@ -38,7 +38,7 @@ const setupQuizSocketHandlers = (io) => {
       }
     });
 
-    // ✅ REJOINDRE UN QUIZ PAR CODE
+    /*// REJOINDRE UN QUIZ PAR CODE
     socket.on("quiz:join_by_code", async ({ invitationCode }) => {
       try {
         console.log(
@@ -110,15 +110,6 @@ const setupQuizSocketHandlers = (io) => {
           questionCount: quiz.questionCount,
         });
 
-        /* // ✅ NOTIFIER LES AUTRES
-        socket.to(`quiz_${quiz.id}`).emit("quiz:player_joined", {
-          userId: socket.userId,
-          userName: user.userName,
-          userPhoto: user.userPhoto,
-          isReady: false,
-          score: 0,
-        });*/
-
         // ✅ CONFIRMER AU JOUEUR
         socket.emit("quiz:joined", {
           quizId: quiz.id,
@@ -134,8 +125,94 @@ const setupQuizSocketHandlers = (io) => {
           message: "Erreur serveur",
         });
       }
-    });
+    });*/
+    // ✅ VERSION ROBUSTE AVEC findOrCreate
+    socket.on("quiz:join_by_code", async ({ invitationCode }) => {
+      try {
+        const quiz = await Quiz.findOne({
+          where: { invitationCode, status: "waiting" },
+        });
 
+        if (!quiz) {
+          socket.emit("quiz:join_error", {
+            message: "Quiz introuvable ou déjà démarré",
+          });
+          return;
+        }
+
+        socket.join(`quiz_${quiz.id}`);
+
+        // 🔥 SOLUTION ULTIME : findOrCreate (maintenant protégé par la contrainte unique)
+        const [participant, created] = await QuizParticipant.findOrCreate({
+          where: {
+            quizId: quiz.id,
+            userId: socket.userId,
+          },
+          defaults: {
+            quizId: quiz.id,
+            userId: socket.userId,
+            isReady: false,
+            score: 0,
+            joinedAt: new Date(),
+          },
+        });
+
+        console.log(
+          `✅ Participant ${created ? "créé" : "existait"} pour quiz ${quiz.id}`,
+        );
+
+        // Récupérer les participants (maintenant sans doublons grâce à la contrainte)
+        const participants = await QuizParticipant.findAll({
+          where: { quizId: quiz.id },
+          include: [
+            {
+              model: User,
+              as: "user",
+              attributes: ["iduser", "userName", "userPhoto"], // Note: c'est "iduser" dans ta table users !
+            },
+          ],
+        });
+
+        const formattedParticipants = participants.map((p) => ({
+          userId: p.userId,
+          userName: p.user.userName,
+          userPhoto: p.user.userPhoto || "/default-avatar.png",
+          isReady: p.isReady,
+          score: p.score || 0,
+        }));
+
+        // Émettre la liste propre
+        io.to(`quiz_${quiz.id}`).emit("quiz:participants_update", {
+          participants: formattedParticipants,
+        });
+
+        // Infos du quiz
+        socket.emit("quiz:quiz_info", {
+          quizId: quiz.id,
+          title: quiz.title,
+          creatorId: quiz.creatorId,
+          questionCount: quiz.questionCount,
+        });
+
+        socket.emit("quiz:joined", {
+          quizId: quiz.id,
+          title: quiz.title,
+          creatorId: quiz.creatorId,
+          isCreator: quiz.creatorId === socket.userId,
+        });
+      } catch (error) {
+        // Si erreur de duplication (normalement plus possible avec la contrainte)
+        if (error.name === "SequelizeUniqueConstraintError") {
+          console.log("⚠️ Tentative de double inscription bloquée");
+          return;
+        }
+
+        console.error("❌ Erreur:", error);
+        socket.emit("quiz:join_error", {
+          message: "Erreur serveur",
+        });
+      }
+    });
     // ✅ MARQUER COMME PRÊT
     socket.on("quiz:player_ready", async ({ quizId }) => {
       try {
@@ -524,19 +601,67 @@ async function evaluateMissingAnswers(io, quizId, quizState) {
   }
 }
 
-// ✅ TIMER
+// MODIFIEZ la fonction startQuestionTimer
 function startQuestionTimer(io, quizId, questionId, duration) {
-  setTimeout(() => {
+  setTimeout(async () => {
     const quizState = activeQuizzes.get(quizId);
     if (!quizState) return;
 
+    // Émettre le temps écoulé
     io.to(`quiz_${quizId}`).emit("quiz:time_up", {
       questionId,
       message: "⏰ Temps écoulé !",
     });
+
+    // ✅ AJOUT: Déclencher automatiquement la correction
+    // Récupérer le quiz pour vérifier le créateur
+    const quiz = await Quiz.findByPk(quizId);
+
+    // Simuler l'événement show_correction (comme si le créateur l'avait fait)
+    try {
+      // Évaluer les réponses manquantes
+      await evaluateMissingAnswers(io, quizId, quizState);
+
+      const currentQuestion =
+        quizState.questions[quizState.currentQuestionIndex];
+
+      // Récupérer les participants avec leurs scores
+      const participants = await QuizParticipant.findAll({
+        where: { quizId },
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["id", "userName", "userPhoto"],
+          },
+        ],
+        order: [["score", "DESC"]],
+      });
+
+      const leaderboard = participants.map((p) => ({
+        userId: p.userId,
+        userName: p.user.userName,
+        userPhoto: p.user.userPhoto || "/default-avatar.png",
+        score: p.score || 0,
+      }));
+
+      // ✅ ENVOYER LA CORRECTION À TOUS AUTOMATIQUEMENT
+      io.to(`quiz_${quizId}`).emit("quiz:show_correction", {
+        questionId: currentQuestion.id,
+        correctAnswer: currentQuestion.correctAnswer,
+        explanation: currentQuestion.explanation,
+        leaderboard,
+        autoTriggered: true, // Indiquer que c'est automatique
+      });
+
+      console.log(
+        `📢 Correction automatique pour quiz ${quizId} (temps écoulé)`,
+      );
+    } catch (error) {
+      console.error("❌ Erreur correction automatique:", error);
+    }
   }, duration * 1000);
 }
-
 // ✅ TERMINER LE QUIZ
 async function endQuiz(io, quizId, quizState) {
   try {
