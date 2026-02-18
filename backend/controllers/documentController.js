@@ -16,9 +16,28 @@ const uploadDocument = async (req, res) => {
     const userId = req.user.id;
 
     const allowedMimeTypes = [
+      // PDF
       "application/pdf",
+
+      // Word
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword",
+
+      // Excel
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+
+      // PowerPoint
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "application/vnd.ms-powerpoint",
+
+      // Texte
       "text/plain",
+
+      // Images (pour OCR)
+      "image/jpeg",
+      "image/png",
+      "image/tiff",
     ];
 
     if (!allowedMimeTypes.includes(mimetype)) {

@@ -109,7 +109,7 @@ const QuizAuto = () => {
     if (!storefile) {
       return;
     }
-    // TODO: Remplacez ceci par la vraie liste d'amis sélectionnés
+    //liste d'amis sélectionnés
     const selectedFriends: Array<{ id: string; name: string }> = [];
     try {
       const formdata = new FormData();

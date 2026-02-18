@@ -180,38 +180,6 @@ const QuizAutoMulti: React.FC = () => {
       setHasJoined(true);
     });
 
-    // 📌 MISE À JOUR DE LA SALLE D'ATTENTE
-    /* newSocket.on("quiz:participants_initial", (data) => {
-      console.log("📋 Liste initiale des participants reçue:", data);
-      newSocket.on("quiz:participants_initial", (data) => {
-        const normalized = data.participants.map((p: any) => ({
-          ...p,
-          userId: Number(p.userId),
-        }));
-        setParticipants(normalized);
-      });
-    });*/
-
-    /* newSocket.on("quiz:player_joined", (data) => {
-      setParticipants((prev) => {
-        const newUserId = Number(data.userId);
-
-        if (prev.some((p) => p.userId === newUserId)) {
-          return prev;
-        }
-
-        return [
-          ...prev,
-          {
-            userId: newUserId,
-            userName: data.userName,
-            userPhoto: data.userPhoto,
-            isReady: false,
-            score: 0,
-          },
-        ];
-      });
-    });*/
     newSocket.on("quiz:participants_update", (data) => {
       setParticipants(data.participants);
     });
@@ -247,15 +215,6 @@ const QuizAutoMulti: React.FC = () => {
       toast.info(`Question ${data.questionNumber}/${data.totalQuestions}`);
     });
 
-    /* // 📌 RÉSULTAT INDIVIDUEL DE LA RÉPONSE
-    newSocket.on("quiz:answer_result", (data) => {
-      console.log("🎯 Résultat réponse:", data);
-      toast.success(
-        data.isCorrect
-          ? `✅ Bonne réponse ! +${data.scoreEarned} points`
-          : `❌ Mauvaise réponse.`,
-      );
-    });*/
     // Dans le useEffect du socket, modifiez le handler quiz:answer_result
     newSocket.on("quiz:answer_result", (data) => {
       console.log("🎯 Résultat réponse:", data);

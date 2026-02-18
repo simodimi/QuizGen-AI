@@ -8,33 +8,65 @@ const UserProgress = require("../models/UserProgress");
 const QuizAnswer = require("../models/QuizAnswer");
 const { Op } = require("sequelize");
 
+// 🔥 Fonction utilitaire pour mélanger un tableau
+const shuffleArray = (array) => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
 const createQuiz = async (quizData, questions = []) => {
   const quiz = await Quiz.create(quizData);
-  const questionPromises = questions.map((q, index) =>
-    Question.create({
+
+  const questionPromises = questions.map((q, index) => {
+    // 🔥 Mélanger les options si c'est un QCM
+    let choices = q.choices || [];
+    if (q.type === "qcm" && choices.length === 4) {
+      // Sauvegarder la bonne réponse (inchangée)
+      const correctAnswer = q.correctAnswer;
+
+      // Mélanger les options
+      choices = shuffleArray(choices);
+
+      // Vérifier que la bonne réponse est toujours dans les options
+      if (!choices.includes(correctAnswer)) {
+        // Si la bonne réponse a été perdue (cas rare), la remettre aléatoirement
+        const randomIndex = Math.floor(Math.random() * 4);
+        choices[randomIndex] = correctAnswer;
+      }
+    }
+
+    return Question.create({
       quizId: quiz.id,
       text: q.text,
       type: q.type,
-      choices: q.choices || [],
+      choices: choices,
       correctAnswer: q.correctAnswer,
       explanation: q.explanation || "",
       order: q.order || index + 1,
       points: q.points || 1,
       timeLimit: q.timeLimit || 40,
-    }),
-  );
+    });
+  });
+
   await Promise.all(questionPromises);
+
   // Ajouter le créateur comme participant si mode solo
   if (quiz.mode === "solo") {
     await QuizParticipant.create({
-      quizId: quiz.id, // Ajouter le créateur comme seul participant
+      quizId: quiz.id,
       userId: quiz.creatorId,
       isReady: true,
       score: 0,
     });
   }
+
   return quiz;
 };
+
 const joinQuizByCode = async (code, userId) => {
   const quiz = await Quiz.findOne({
     where: { invitationCode: code },
@@ -55,7 +87,6 @@ const joinQuizByCode = async (code, userId) => {
     throw new Error("Ce quiz a déjà démarré ou est terminé");
   }
 
-  // NOUVEAU CODE : findOrCreate au lieu de findOne + create
   const [participant, created] = await QuizParticipant.findOrCreate({
     where: {
       quizId: quiz.id,
@@ -94,7 +125,7 @@ const startQuiz = async (quizId, creatorId) => {
   quiz.startedAt = new Date();
   quiz.currentQuestionIndex = 0;
   await quiz.save();
-  // Récupérer la première question
+
   const firstQuestion = await Question.findOne({
     where: { quizId },
     order: [["order", "ASC"]],
@@ -109,7 +140,7 @@ const submitAnswer = async (quizId, questionId, userId, answer, timeSpent) => {
   if (!question || question.quizId !== parseInt(quizId)) {
     throw new Error("Question non valide");
   }
-  // Vérifier si la réponse est correcte
+
   let isCorrect = false;
   if (question.type === "qcm" || question.type === "multiple") {
     const correctAnswers = Array.isArray(question.correctAnswer)
@@ -128,11 +159,10 @@ const submitAnswer = async (quizId, questionId, userId, answer, timeSpent) => {
       .trim();
     isCorrect = userAnswer === correctAnswer;
   }
-  // Calcul du score
+
   const basePoints = question.points || 1;
-  //const timeBonus = timeSpent < 10 ? 0.5 : 0;
-  scoreEarned = isCorrect ? basePoints /*+ timeBonus*/ : 0;
-  // Enregistrer la réponse
+  const scoreEarned = isCorrect ? basePoints : 0;
+
   const quizAnswer = await QuizAnswer.create({
     quizId,
     questionId,
@@ -143,7 +173,7 @@ const submitAnswer = async (quizId, questionId, userId, answer, timeSpent) => {
     score: scoreEarned,
     answeredAt: new Date(),
   });
-  // Mettre à jour le score du participant
+
   const participant = await QuizParticipant.findOne({
     where: { quizId, userId },
   });
@@ -152,6 +182,7 @@ const submitAnswer = async (quizId, questionId, userId, answer, timeSpent) => {
     participant.lastAnswerAt = new Date();
     await participant.save();
   }
+
   return {
     quizAnswer,
     isCorrect,
@@ -172,7 +203,6 @@ const endQuiz = async (quizId, creatorId) => {
     throw new Error("Quiz non en cours");
   }
 
-  // Calculer les scores finaux
   const participants = await QuizParticipant.findAll({
     where: { quizId },
     include: [
@@ -187,20 +217,21 @@ const endQuiz = async (quizId, creatorId) => {
       ["lastAnswerAt", "ASC"],
     ],
   });
-  // Mettre à jour les positions
+
   for (let i = 0; i < participants.length; i++) {
     participants[i].position = i + 1;
     await participants[i].save();
   }
-  // Mettre à jour le quiz
+
   quiz.status = "finished";
   quiz.finishedAt = new Date();
   quiz.winnerId = participants[0]?.userId || null;
   await quiz.save();
-  // Mettre à jour la progression des utilisateurs
+
   for (const participant of participants) {
     await updateUserProgress(participant.userId, participant.score);
   }
+
   return {
     quiz,
     finalScores: participants.map((p) => ({
@@ -235,6 +266,42 @@ const updateUserProgress = async (userId, score) => {
     });
   }
 };
+// Ajouter cette fonction dans quizService.js
+const enhanceQuizQuestions = (questions) => {
+  return questions.map((q) => {
+    if (q.type === "qcm" && q.choices && q.choices.length === 4) {
+      // Analyser les options pour s'assurer qu'elles sont pertinentes
+      const options = [...q.choices];
+      const correctIndex = options.indexOf(q.correctAnswer);
+
+      // Si la bonne réponse n'est pas trouvée, la remettre
+      if (correctIndex === -1) {
+        options[Math.floor(Math.random() * 4)] = q.correctAnswer;
+      }
+
+      // S'assurer qu'il y a une option piège (similaire à la bonne)
+      const similarOption = options.find(
+        (opt) =>
+          opt !== q.correctAnswer &&
+          (opt.includes(q.correctAnswer.substring(0, 10)) ||
+            q.correctAnswer.includes(opt.substring(0, 10))),
+      );
+
+      // Si pas d'option piège, en créer une
+      if (!similarOption) {
+        const trapOption = q.correctAnswer + " (inversé)";
+        options[options.indexOf(q.correctAnswer) === 0 ? 1 : 0] = trapOption;
+      }
+
+      return {
+        ...q,
+        choices: shuffleArray(options),
+      };
+    }
+    return q;
+  });
+};
+
 module.exports = {
   createQuiz,
   joinQuizByCode,
@@ -242,4 +309,5 @@ module.exports = {
   submitAnswer,
   endQuiz,
   updateUserProgress,
+  enhanceQuizQuestions,
 };

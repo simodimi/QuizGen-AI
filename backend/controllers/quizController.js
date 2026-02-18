@@ -10,15 +10,40 @@ const {
 const { Op } = require("sequelize");
 const quizService = require("../services/quizService");
 const aiQuizService = require("../services/iaQuizService");
+const { analyzeDocumentStructure } = require("../services/sectionService");
 
 const generateQuizFromDocument = async (req, res) => {
   try {
+    if (global.quizGenerationLock === req.user.id) {
+      return res.status(429).json({
+        success: false,
+        message: "Un quiz est déjà en cours de génération",
+      });
+    }
+
+    global.quizGenerationLock = req.user.id;
     const { documentId } = req.params;
     const {
       mode = "solo",
       difficulty = "medium",
       selectedFriends = [],
     } = req.body;
+    const userId = req.user.id;
+
+    // Fonction pour envoyer la progression via Socket.IO
+    const sendProgress = (step, message, progress) => {
+      if (global.io) {
+        global.io.to(`user_${userId}`).emit("quiz:generation_progress", {
+          step,
+          message,
+          progress,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      console.log(`📊 [${progress}%] ${message}`);
+    };
+
+    sendProgress(1, "🔍 Recherche du document...", 5);
 
     const document = await Document.findByPk(documentId, {
       include: [{ model: Section, as: "sections" }],
@@ -30,15 +55,19 @@ const generateQuizFromDocument = async (req, res) => {
         .json({ message: "Document non trouvé ou accès refusé" });
     }
 
-    // Concaténer tout le contenu
+    sendProgress(2, `📄 Document trouvé: ${document.fileName}`, 10);
+
     const context = document.sections.map((s) => s.content).join("\n\n");
 
-    // 🔥 DÉTECTION DU TYPE DE DOCUMENT BASÉ SUR LE NOM DU FICHIER ET LE CONTENU
+    sendProgress(3, "📊 Analyse de la structure du document...", 15);
+
+    const documentStructure = analyzeDocumentStructure(context);
+
+    // 🔥 DÉTECTION DU TYPE DE DOCUMENT
     let documentType = "general";
     const fileName = document.fileName?.toLowerCase() || "";
     const sampleText = context.substring(0, 500).toLowerCase();
 
-    // 1. D'abord vérifier le nom du fichier
     if (
       fileName.includes("cv") ||
       fileName.includes("curriculum") ||
@@ -77,9 +106,7 @@ const generateQuizFromDocument = async (req, res) => {
       fileName.includes("programmation")
     ) {
       documentType = "informatique";
-    }
-    // 2. Sinon détecter par le contenu
-    else {
+    } else {
       if (
         /(histoire|historique|date|siècle|antiquité|révolution|guerre)/i.test(
           sampleText,
@@ -136,47 +163,60 @@ const generateQuizFromDocument = async (req, res) => {
     console.log(`📁 Fichier: ${document.fileName}`);
     console.log(`🔍 Type de document détecté: ${documentType}`);
 
-    // Analyser le document pour déterminer le nombre optimal de questions
+    sendProgress(4, `🔍 Type de document détecté: ${documentType}`, 20);
+
     const optimalQuestionCount = calculateOptimalQuestionCount(context);
 
-    console.log(
-      `Document analysé - Longueur: ${context.length} caractères, ${context.split(/\s+/).length} mots`,
-    );
-    console.log(
-      `Nombre optimal de questions déterminé: ${optimalQuestionCount}`,
+    sendProgress(
+      5,
+      `🧮 Nombre optimal de questions: ${optimalQuestionCount}`,
+      25,
     );
 
-    // 🔥 PASSER LE documentType AU SERVICE IA
+    // 🔥 PASSER LA STRUCTURE AU SERVICE IA
     const aiResult = await aiQuizService.generateQuizFromText(context, {
       questionCount: optimalQuestionCount,
       difficulty,
-      documentType: documentType, // ← CRITIQUE: passer le type détecté
+      documentType: documentType,
+      documentStructure,
+      onProgress: (progress) => {
+        // Relayer la progression du service IA
+        sendProgress(
+          5 + progress.step,
+          progress.message,
+          25 + progress.progress * 0.6, // Mapper 0-100% à 25-85%
+        );
+      },
     });
+    sendProgress(11, "✅ Quiz généré, création en base de données...", 90);
 
-    // 🔥 TITRE DYNAMIQUE BASÉ SUR LE TYPE DE DOCUMENT
-    let title = "";
-    if (documentType === "cv") {
-      title = `Quiz sur CV - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
-    } else if (documentType === "histoire") {
-      title = `Quiz d'histoire - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
-    } else if (documentType === "scientifique") {
-      title = `Quiz scientifique - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
-    } else if (documentType === "mathématiques") {
-      title = `Quiz de mathématiques - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
-    } else if (documentType === "politique") {
-      title = `Quiz politique - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
-    } else if (documentType === "économique") {
-      title = `Quiz économique - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
-    } else if (documentType === "littéraire") {
-      title = `Quiz littéraire - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
-    } else if (documentType === "médical") {
-      title = `Quiz médical - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
-    } else if (documentType === "informatique") {
-      title = `Quiz informatique - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
-    } else {
-      title =
-        `Quiz - ${document.fileName.replace(/\.[^/.]+$/, "")}` ||
-        aiResult.title;
+    if (!aiResult.questions || aiResult.questions.length === 0) {
+      throw new Error("Aucune question valide générée");
+    }
+
+    let title = aiResult.title || "";
+    if (!title || title.includes("Quiz sur")) {
+      if (documentType === "cv") {
+        title = `Quiz sur CV - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
+      } else if (documentType === "histoire") {
+        title = `Quiz d'histoire - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
+      } else if (documentType === "scientifique") {
+        title = `Quiz scientifique - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
+      } else if (documentType === "mathématiques") {
+        title = `Quiz de mathématiques - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
+      } else if (documentType === "politique") {
+        title = `Quiz politique - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
+      } else if (documentType === "économique") {
+        title = `Quiz économique - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
+      } else if (documentType === "littéraire") {
+        title = `Quiz littéraire - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
+      } else if (documentType === "médical") {
+        title = `Quiz médical - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
+      } else if (documentType === "informatique") {
+        title = `Quiz informatique - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
+      } else {
+        title = `Quiz - ${document.fileName.replace(/\.[^/.]+$/, "")}`;
+      }
     }
 
     const quiz = await quizService.createQuiz(
@@ -200,7 +240,6 @@ const generateQuizFromDocument = async (req, res) => {
       invitationCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       quiz.invitationCode = invitationCode;
 
-      // Ajouter le créateur comme participant
       await QuizParticipant.create({
         quizId: quiz.id,
         userId: req.user.id,
@@ -208,7 +247,6 @@ const generateQuizFromDocument = async (req, res) => {
         score: 0,
       });
 
-      // Si des amis sont spécifiés, les inviter automatiquement
       if (selectedFriends && selectedFriends.length > 0) {
         const creator = await User.findByPk(req.user.id);
 
@@ -228,7 +266,7 @@ const generateQuizFromDocument = async (req, res) => {
       }
       await quiz.save();
     }
-
+    sendProgress(12, "✅ Quiz prêt et enregistré", 100);
     res.status(201).json({
       success: true,
       message: "Quiz généré avec succès",
@@ -237,55 +275,50 @@ const generateQuizFromDocument = async (req, res) => {
       questionCount: aiResult.questions.length,
       optimalQuestionCount: optimalQuestionCount,
       mode,
-      documentType: documentType, // ← Retourner le type au frontend
+      documentType: documentType,
       documentStats: {
         characters: context.length,
         words: context.split(/\s+/).length,
         sections: document.sections.length,
+        hasLists: documentStructure.hasLists,
+        hasDates: documentStructure.hasDates,
+        hasDefinitions: documentStructure.hasDefinitions,
       },
     });
   } catch (error) {
     console.error("❌ Erreur génération quiz:", error);
+    if (global.io) {
+      global.io.to(`user_${req.user.id}`).emit("quiz:generation_error", {
+        message: error.message || "Erreur lors de la génération",
+        timestamp: new Date().toISOString(),
+      });
+    }
     res.status(500).json({
       success: false,
       message: error.message || "Erreur lors de la génération",
     });
+  } finally {
+    global.quizGenerationLock = null;
   }
 };
-
-// Fonction pour calculer le nombre optimal de questions
+// NOUVELLE VERSION (rapide)
 const calculateOptimalQuestionCount = (text) => {
   if (!text || text.trim().length === 0) {
-    return 5; // Minimum par défaut
+    return 3; // Minimum 3 questions
   }
 
-  const cleanedText = text.trim();
-  const characterCount = cleanedText.length;
-  const wordCount = cleanedText.split(/\s+/).filter((w) => w.length > 1).length;
-  const sentenceCount = (cleanedText.match(/[.!?]+/g) || []).length;
+  const wordCount = text.split(/\s+/).filter((w) => w.length > 1).length;
 
-  console.log(
-    `Analyse document: ${characterCount} caractères, ${wordCount} mots, ${sentenceCount} phrases`,
-  );
+  console.log(`📊 Analyse document: ${wordCount} mots`);
 
-  // Basé sur le nombre de mots
-  if (wordCount < 300) {
-    // Très court : 5-7 questions
-    return Math.max(5, Math.min(7, Math.floor(wordCount / 50)));
-  } else if (wordCount < 800) {
-    // Court : 8-12 questions
-    return Math.max(8, Math.min(12, Math.floor(wordCount / 70)));
-  } else if (wordCount < 2000) {
-    // Moyen : 10-15 questions
-    return Math.max(10, Math.min(15, Math.floor(wordCount / 100)));
-  } else if (wordCount < 5000) {
-    // Long : 12-20 questions
-    return Math.max(12, Math.min(20, Math.floor(wordCount / 150)));
-  } else {
-    // Très long : 15-25 questions (max)
-    return Math.max(15, Math.min(25, Math.floor(wordCount / 250)));
-  }
+  // 🔥 BEAUCOUP MOINS DE QUESTIONS POUR ALLER PLUS VITE
+  if (wordCount < 500) return 3; // Petit document
+  if (wordCount < 1000) return 4; // Document moyen
+  if (wordCount < 2000) return 5; // Document long
+  if (wordCount < 4000) return 6; // Très long document (comme votre PDF)
+  return 8; // Maximum 20 questions
 };
+
 const createPredefinedQuiz = async (req, res) => {
   try {
     const {
@@ -399,6 +432,7 @@ const joinQuizByCode = async (req, res) => {
       mode: result.quiz.mode,
       participantId: result.participant.id,
     });
+
     const participants = await QuizParticipant.findAll({
       where: { quizId: result.quiz.id },
       include: [{ model: User, as: "user" }],
@@ -479,7 +513,6 @@ const endQuiz = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Vérifiez d'abord le statut actuel
     const quiz = await Quiz.findByPk(id);
 
     if (!quiz) {
@@ -489,7 +522,6 @@ const endQuiz = async (req, res) => {
       });
     }
 
-    // Si le quiz est déjà terminé, retournez quand même les résultats
     if (quiz.status === "finished") {
       const participants = await QuizParticipant.findAll({
         where: { quizId: id },
@@ -643,7 +675,6 @@ const getUserQuizzes = async (req, res) => {
     if (type === "created") {
       where.creatorId = userId;
     } else if (type === "participating") {
-      // Récupérer via QuizParticipant
       const participations = await QuizParticipant.findAll({
         where: { userId },
         attributes: ["quizId"],
@@ -713,6 +744,7 @@ const cancelQuiz = async (req, res) => {
     res.status(500).json({ message: "Erreur serveur" });
   }
 };
+
 const detailQuiz = async (req, res) => {
   try {
     const { code } = req.params;

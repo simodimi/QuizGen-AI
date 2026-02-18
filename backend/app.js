@@ -12,7 +12,7 @@ const server = http.createServer(app);
 const { apiLimiter } = require("./middlewares/ratelimit");
 const { Server } = require("socket.io");
 const User = require("./models/User");
-
+const ollamaService = require("../backend/config/ollama");
 // Configuration CORS
 const CLIENT_ORIGIN = "http://localhost:5173";
 const corsOptions = {
@@ -58,7 +58,23 @@ app.use(
     immutable: true,
   }),
 );
+setTimeout(async () => {
+  try {
+    console.log("🔍 Vérification d'Ollama en arrière-plan...");
+    const test = await ollamaService.test();
 
+    if (test.success) {
+      console.log("\n✅ Ollama est accessible");
+    } else {
+      console.log("\n⚠️ Ollama n'est pas encore prêt");
+      console.log(
+        "👉 Le serveur continuera à fonctionner, les quiz seront générés quand Ollama sera disponible",
+      );
+    }
+  } catch (error) {
+    console.log("⚠️ Impossible de contacter Ollama pour le moment");
+  }
+}, 5000); // Attendre 5 secondes avant de tester
 // 3. IMPORT DES MIDDLEWARES D'AUTH
 const { verifyToken } = require("./middlewares/authMiddleware");
 

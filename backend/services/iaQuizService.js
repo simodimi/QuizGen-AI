@@ -1,277 +1,268 @@
-const { model } = require("../config/openai");
+// services/iaQuizService.js - VERSION CORRIGÉE
+const ollamaService = require("../config/ollama");
 
-const generateQuizFromText = async (text, options = {}) => {
-  const {
-    questionCount = 10,
-    difficulty = "medium",
-    documentType = "general", // ← "general" par défaut, plus "cv" spécifique
-  } = options;
+// Détection de la langue
+const detectLanguage = (text) => {
+  const frenchIndicators = [
+    "le ",
+    "la ",
+    "les ",
+    "un ",
+    "une ",
+    "des ",
+    "est ",
+    "sont ",
+    "dans ",
+    "pour ",
+    "avec ",
+    "qui ",
+    "que ",
+    "dont ",
+    "où ",
+    "comment ",
+  ];
 
-  let cleanText = "";
+  const sample = text.toLowerCase().substring(0, 2000);
+  let frenchScore = 0;
 
-  try {
-    cleanText = text
-      .replace(/\s+/g, " ")
-      .replace(/[^\w\s.,!?\-:;()'"À-ÿ]/g, " ")
-      .trim();
+  frenchIndicators.forEach((word) => {
+    const regex = new RegExp(`\\b${word}\\b`, "g");
+    const matches = sample.match(regex);
+    if (matches) frenchScore += matches.length * 2;
+  });
 
-    if (cleanText.length < 100) {
-      throw new Error("Texte trop court pour générer un quiz");
-    }
+  const accentCount = (sample.match(/[éèêëàâäîïôûùüç]/g) || []).length;
+  frenchScore += accentCount * 3;
 
-    // Détection générique du type de document basée sur le contenu
-    let documentContext = documentType || "general";
+  return frenchScore > 20 ? "fr" : "en";
+};
 
-    // Utiliser le type passé en paramètre si disponible
-    if (options.documentType && options.documentType !== "general") {
-      documentContext = options.documentType;
-      console.log(`📌 Type de document forcé: ${documentContext}`);
-    }
-    // Sinon, essayer de détecter automatiquement
-    else {
-      const sampleText = cleanText.substring(0, 500).toLowerCase();
+// Extraction des parties pertinentes
+const extractRelevantParts = (text, maxLength = 2000) => {
+  if (!text || text.length <= maxLength) return text;
+  return text.substring(0, maxLength);
+};
 
-      if (
-        /(histoire|historique|date|siècle|antiquité|révolution|guerre)/i.test(
-          sampleText,
-        )
-      ) {
-        documentContext = "histoire";
-      } else if (
-        /(biologie|chimie|physique|molécule|atome|cellule|gène|expérience)/i.test(
-          sampleText,
-        )
-      ) {
-        documentContext = "scientifique";
-      } else if (
-        /(math|calcul|équation|formule|théorème|algèbre|géométrie)/i.test(
-          sampleText,
-        )
-      ) {
-        documentContext = "mathématiques";
-      } else if (
-        /(politique|gouvernement|élection|démocratie|parlement|constitution)/i.test(
-          sampleText,
-        )
-      ) {
-        documentContext = "politique";
-      } else if (
-        /(économie|finance|marché|entreprise|investissement|capital)/i.test(
-          sampleText,
-        )
-      ) {
-        documentContext = "économique";
-      } else if (
-        /(littérature|roman|poème|auteur|écrivain|chapitre)/i.test(sampleText)
-      ) {
-        documentContext = "littéraire";
-      } else if (
-        /(médecine|santé|maladie|traitement|patient|hôpital)/i.test(sampleText)
-      ) {
-        documentContext = "médical";
-      } else if (
-        /(informatique|logiciel|programmation|développement|code|algorithme)/i.test(
-          sampleText,
-        )
-      ) {
-        documentContext = "informatique";
-      } else if (
-        /(cv|curriculum|compétences|expérience|poste|formation|diplôme)/i.test(
-          sampleText,
-        )
-      ) {
-        documentContext = "cv";
-      } else {
-        documentContext = "général";
-      }
+// 🔥 NOUVEAU PROMPT PLUS SIMPLE
+const buildQuizPrompt = (text, options) => {
+  const { questionCount } = options;
 
-      console.log(`🔍 Type de document détecté: ${documentContext}`);
-    }
+  return `Génère ${questionCount} questions QCM en français basées sur ce texte.
 
-    const prompt = `
-Tu es un expert en création de quiz éducatifs adaptés au type de document.
+RÈGLES:
+- Réponds UNIQUEMENT avec du JSON valide
+- Pas de texte avant ou après
+- 4 propositions par question
+- La bonne réponse doit être dans les propositions
 
-TYPE DE DOCUMENT: ${documentContext}
-DIFFICULTÉ: ${difficulty}
-NOMBRE DE QUESTIONS: ${questionCount}
-
-TEXTE SOURCE:
-"""
-${cleanText.substring(0, 4000)}
-"""
-
-IMPORTANT: 
-- GÉNÈRE ${questionCount} questions ORIGINALES et SPÉCIFIQUES à ce document ${documentContext}.
-- Les questions doivent être UNIQUEMENT basées sur le texte fourni
-- Les questions DOIVENT être basées UNIQUEMENT sur le texte source fourni
-- Ne PAS inventer d'informations qui ne sont pas dans le texte
-- Ne PAS réutiliser d'anciennes questions de quiz précédents
-- Crée des questions ORIGINALES et SPÉCIFIQUES à ce document
-
-FORMAT JSON STRICT À RETOURNER:
+FORMAT:
 {
-  "title": "Quiz sur ${documentContext} - [Thème principal du document]",
-  "documentType": "${documentContext}",
   "questions": [
     {
-      "text": "Question claire et complète",
-      "type": "qcm | multiple | open",
+      "text": "Question?",
       "choices": ["Option 1", "Option 2", "Option 3", "Option 4"],
-      "correctAnswer": "Réponse correcte",
-      "explanation": "Explication détaillée basée sur le texte",
-      "points": 1,
-      "difficulty": "${difficulty}"
+      "correctAnswer": "Option 1",
+      "explanation": "Explication"
     }
   ]
 }
 
-RÈGLES:
-1. TOUTES les questions DOIVENT être directement liées au texte
-2. Pour les QCM: 4 options dont UNE seule correcte
-3. Pour "multiple": au moins 2 réponses correctes
-4. Pour "open": réponse libre (une phrase)
-`;
+TEXTE:
+${text}
 
-    console.log(
-      `📝 Génération de ${questionCount} questions pour document type: ${documentContext}`,
-    );
+JSON:`;
+};
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const textResponse = response.text();
+// 🔥 EXTRACTION JSON ROBUSTE
+const extractJSON = (text) => {
+  try {
+    // Nettoyer le texte
+    let cleaned = text
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .replace(/\\n/g, " ")
+      .replace(/\n/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
 
-    const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      let quizData;
-      try {
-        quizData = JSON.parse(jsonMatch[0]);
-      } catch (parseError) {
-        console.error("Erreur parsing JSON:", parseError);
-        throw new Error("Format JSON invalide");
-      }
+    // Chercher le premier { et dernier }
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
 
-      // VALIDATION et POST-TRAITEMENT des questions
-      quizData.questions = quizData.questions
-        .map((q, index) => {
-          const question = {
-            ...q,
-            text: (q.text || "").replace(/\.\.\.$/, "").trim(),
-            order: index + 1,
-            type: q.type || "qcm",
-            points: q.points || 1,
-            difficulty: q.difficulty || difficulty,
-          };
+    if (start === -1 || end === -1) return null;
 
-          // Validation des options pour QCM et MULTIPLE
-          if (question.type === "multiple" || question.type === "qcm") {
-            if (
-              !question.choices ||
-              !Array.isArray(question.choices) ||
-              question.choices.length < 2
-            ) {
-              console.warn(
-                `Question ${index + 1}: Pas assez d'options, conversion en open`,
-              );
-              question.type = "open";
-              delete question.choices;
-            } else {
-              question.choices = question.choices
-                .map((choice) => choice.toString().trim())
-                .filter((choice) => choice.length > 0)
-                .slice(0, 4);
-            }
-          }
+    let jsonStr = cleaned.substring(start, end + 1);
 
-          return question;
-        })
-        .filter((q) => q.text && q.text.length > 5);
+    // Réparer les erreurs courantes
+    jsonStr = jsonStr
+      .replace(/,(\s*[}\]])/g, "$1") // Virgules en trop
+      .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3'); // Clés sans quotes
 
-      return {
-        ...quizData,
-        documentType: documentContext,
-      };
-    } else {
-      throw new Error("Format de réponse JSON invalide");
-    }
-  } catch (error) {
-    console.error("❌ Erreur génération quiz IA:", error.message);
-    return generateFallbackQuiz(
-      text,
-      questionCount,
-      options.documentType || "general",
-    );
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    console.log("❌ Erreur JSON:", e.message);
+    return null;
   }
 };
 
-// 🔥 NOUVEAU: Fallback générique pour tous les types de documents
-const generateFallbackQuiz = (text, targetCount, documentType = "general") => {
-  console.log(`📋 Fallback pour document type: ${documentType}`);
+// 🔥 VALIDATION DES QUESTIONS
+const validateQuestions = (questions) => {
+  if (!questions || !Array.isArray(questions)) return [];
 
-  const cleanText = text.replace(/\s+/g, " ").trim();
-  const sentences = cleanText
+  return questions.filter(
+    (q) =>
+      q.text &&
+      q.text.length > 10 &&
+      q.choices &&
+      q.choices.length === 4 &&
+      q.correctAnswer &&
+      q.choices.includes(q.correctAnswer),
+  );
+};
+
+// 🔥 FALLBACK SIMPLE MAIS EFFICACE
+const generateFallbackQuestions = (text, count = 4) => {
+  console.log("🔄 Génération de questions fallback...");
+
+  // Extraire les phrases
+  const sentences = text
     .split(/[.!?]+/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 20);
+    .filter((s) => s.length > 30 && s.length < 200)
+    .slice(0, count);
 
   const questions = [];
 
-  // Générer des questions basées sur les phrases du texte
-  for (let i = 0; i < Math.min(targetCount, sentences.length); i++) {
-    if (questions.length >= targetCount) break;
-
+  for (let i = 0; i < sentences.length; i++) {
     const sentence = sentences[i];
-    const words = sentence.split(/\s+/);
-    const keyWords = words
-      .filter(
-        (w) =>
-          w.length > 4 && !/^(les|des|une|pour|dans|avec|cette|ces)$/i.test(w),
-      )
-      .slice(0, 3);
+    const words = sentence.split(" ");
+    const keyWord = words.find((w) => w.length > 5) || words[0] || "concept";
 
-    if (keyWords.length > 0) {
-      questions.push({
-        text: `Que dit le document à propos de "${keyWords.join(" ")}"?`,
-        type: "qcm",
-        choices: [
-          sentence.substring(0, 60) + "...",
-          "Cette information n'est pas dans le texte",
-          "C'est un détail secondaire",
-          "Le texte n'en parle pas directement",
-        ],
-        correctAnswer: sentence.substring(0, 60) + "...",
-        explanation: `Le texte indique: "${sentence.substring(0, 150)}..."`,
-        points: 1,
-        order: questions.length + 1,
-      });
-    }
-  }
-
-  // Questions génériques si pas assez
-  while (questions.length < Math.min(targetCount, 5)) {
     questions.push({
-      text: `Quel est le thème principal de ce document ${documentType}?`,
+      text: `Que dit le texte à propos de "${keyWord}" ?`,
       type: "qcm",
       choices: [
-        `Document ${documentType}`,
-        "Document technique",
-        "Document narratif",
-        "Document administratif",
-      ],
-      correctAnswer: `Document ${documentType}`,
-      explanation: `Le document traite principalement de ${documentType}.`,
+        sentence.substring(0, 60) + "...",
+        `Le texte ne parle pas de ${keyWord}.`,
+        `${keyWord} n'est pas mentionné.`,
+        `Information incorrecte sur ${keyWord}.`,
+      ].sort(() => Math.random() - 0.5),
+      correctAnswer: sentence.substring(0, 60) + "...",
+      explanation: `D'après le texte : "${sentence}"`,
       points: 1,
-      order: questions.length + 1,
+    });
+  }
+
+  // Compléter si pas assez de phrases
+  while (questions.length < count) {
+    questions.push({
+      text: `Question ${questions.length + 1} sur le document`,
+      type: "qcm",
+      choices: ["Option A", "Option B", "Option C", "Option D"],
+      correctAnswer: "Option A",
+      explanation: "Basé sur le contenu du document.",
+      points: 1,
     });
   }
 
   return {
-    title: `Quiz - Document ${documentType}`,
-    documentType: documentType,
-    questions: questions.slice(0, targetCount),
+    title: "Quiz généré",
+    questions: questions.slice(0, count),
   };
 };
 
-module.exports = {
-  generateQuizFromText,
-  generateFallbackQuiz,
+// 🔥 FONCTION PRINCIPALE
+const generateQuizFromText = async (text, options = {}) => {
+  const {
+    questionCount = 4,
+    difficulty = "medium",
+    documentType = "general",
+    onProgress = () => {},
+  } = options;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes
+
+  try {
+    onProgress({ step: 1, message: "🧹 Préparation...", progress: 10 });
+
+    if (!text || text.length < 100) {
+      throw new Error("Texte trop court");
+    }
+
+    const cleanText = text.replace(/\s+/g, " ").trim().substring(0, 2000);
+    const wordCount = cleanText.split(/\s+/).length;
+
+    onProgress({
+      step: 2,
+      message: `📊 ${wordCount} mots trouvés`,
+      progress: 20,
+    });
+
+    // Adapter le nombre de questions
+    let adjustedCount = questionCount;
+    if (wordCount < 300) adjustedCount = 2;
+    else if (wordCount < 600) adjustedCount = 3;
+    else adjustedCount = Math.min(4, questionCount);
+
+    onProgress({
+      step: 3,
+      message: `🤖 Génération de ${adjustedCount} questions...`,
+      progress: 30,
+    });
+
+    const prompt = buildQuizPrompt(cleanText, {
+      questionCount: adjustedCount,
+      difficulty,
+      documentType,
+    });
+
+    console.log("🚀 Envoi à Ollama...");
+    const response = await ollamaService.generate(prompt, {
+      temperature: 0.2,
+      max_tokens: 1000,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    onProgress({ step: 4, message: "📥 Analyse...", progress: 60 });
+
+    const quizData = extractJSON(response);
+
+    if (!quizData || !quizData.questions) {
+      console.log("⚠️ JSON invalide, fallback");
+      return generateFallbackQuestions(cleanText, adjustedCount);
+    }
+
+    const validQuestions = validateQuestions(quizData.questions);
+
+    if (validQuestions.length === 0) {
+      console.log("⚠️ Aucune question valide, fallback");
+      return generateFallbackQuestions(cleanText, adjustedCount);
+    }
+
+    onProgress({
+      step: 5,
+      message: `✅ ${validQuestions.length} questions`,
+      progress: 100,
+    });
+
+    return {
+      title: quizData.title || `Quiz ${documentType}`,
+      documentType,
+      difficulty,
+      questions: validQuestions.slice(0, adjustedCount),
+      metadata: { generated: true },
+    };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    console.error("❌ Erreur:", error.message);
+
+    onProgress({ step: 6, message: "⚠️ Fallback...", progress: 90 });
+
+    return generateFallbackQuestions(text, questionCount);
+  }
 };
+
+module.exports = { generateQuizFromText };

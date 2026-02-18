@@ -1,7 +1,8 @@
 {
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "axios": "^1.13.2",
+    "@huggingface/inference": "^4.13.12",
+    "axios": "^1.13.5",
     "bcrypt": "^6.0.0",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
@@ -21,11 +22,14 @@
     "nodemon": "^3.1.11",
     "openai": "^6.16.0",
     "pdf-parse": "^2.4.5",
+    "pptx2json": "^0.0.10",
     "qdrant-client": "^0.0.1",
     "sequelize": "^6.37.7",
     "socket.io": "^4.8.3",
     "supertest": "^7.2.2",
+    "tesseract.js": "^7.0.0",
     "uuid": "^13.0.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.5"
   }
 }
