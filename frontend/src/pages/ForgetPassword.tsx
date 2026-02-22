@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { use, useState, type ChangeEvent, type FormEvent } from "react";
 import logo from "../assets/icone/quiz.png";
 import Button from "../components/ui/Button";
 import eye from "../assets/icone/ouvert.png";
@@ -9,6 +9,10 @@ import Step from "@mui/material/Step";
 import StepButton from "@mui/material/StepButton";
 import { Link, useNavigate } from "react-router-dom";
 import "../style/connexion.css";
+import { useAuth } from "../services/AuthContextUser";
+import connect from "../services/Util";
+import { toast } from "react-toastify";
+import { set } from "date-fns";
 
 const ForgetPassword = () => {
   interface FormData {
@@ -29,6 +33,7 @@ const ForgetPassword = () => {
   const [errorsms, seterrorsms] = useState<string>("");
   const [hideerrorsms, sethideerrorsms] = useState<boolean>(false);
   const [hidecheckpassword, sethidecheckpassword] = useState<boolean>(false);
+  const { user } = useAuth();
   const [formdata, setformdata] = useState<FormData>({
     userEmail: "",
     userPassword: "",
@@ -56,14 +61,14 @@ const ForgetPassword = () => {
     setpasstype(items ? "text" : "password");
   };
   const handlePass1 = (): void => {
-    const items = !showeye;
+    const items = !showeye1;
     setshoweye1(items);
     setpasstype1(items ? "text" : "password");
   };
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
   };
-  const handleValider = (): void => {
+  const handleValider = async () => {
     if (activeStep === 2) {
       if (formdata.userPassword !== formdata.userPasswordAgain) {
         seterrorsms("Les mots de passe ne correspondent pas.");
@@ -88,10 +93,22 @@ const ForgetPassword = () => {
         sethideerrorsms(true);
         return;
       }
-      seterrorsms("");
-      sethideerrorsms(false);
-      sethidecheckpassword(false);
-      navigate("/connexion");
+      try {
+        const res = await connect.post("/api/auth/reset-password", {
+          userEmail: formdata.userEmail,
+          userPassword: formdata.userPassword,
+        });
+        if (res.status === 200) {
+          seterrorsms("");
+          sethideerrorsms(false);
+          sethidecheckpassword(false);
+          toast.success("Mot de passe réinitialisé avec succès.");
+          navigate("/connexion");
+        }
+      } catch (error) {
+        toast.error("Erreur lors de la réinitialisation du mot de passe.");
+      }
+
       console.log({
         userEmail: formdata.userEmail,
         userPassword: formdata.userPassword,
@@ -106,7 +123,7 @@ const ForgetPassword = () => {
     [k: number]: boolean;
   } = {};
 
-  const handleNext = (): void => {
+  const handleNext = async () => {
     if (activeStep === 0) {
       if (!formdata.userEmail) {
         seterrorsms("Veuillez remplir tous les champs.");
@@ -119,23 +136,54 @@ const ForgetPassword = () => {
         sethideerrorsms(true);
         return;
       }
-      seterrorsms("");
-      sethideerrorsms(false);
-      setActiveStep((prevActiveStep) => prevActiveStep + 1);
+      try {
+        const res = await connect.post("/api/auth/forgot-password", {
+          userEmail: formdata.userEmail,
+        });
+        if (res.status === 200) {
+          seterrorsms("");
+          sethideerrorsms(false);
+          setActiveStep((prevActiveStep) => prevActiveStep + 1);
+          toast.success(
+            "Code de réinitialisation envoyé à votre adresse e-mail.",
+          );
+        }
+      } catch (error) {
+        toast.error("Erreur lors de l'envoie de l'email. Veuillez réessayer.");
+        setActiveStep(0);
+      }
     }
     if (activeStep === 1) {
       if (!formdata.userCode) {
         seterrorsms("Veuillez remplir tous les champs.");
+        toast.error("Veuillez remplir tous les champs.");
         sethideerrorsms(true);
         return;
       }
-      seterrorsms("");
-      sethideerrorsms(false);
-      setActiveStep((prevActiveStep) => prevActiveStep + 1);
+      try {
+        const res = await connect.post("/api/auth/verify-code", {
+          userEmail: formdata.userEmail,
+          userCode: formdata.userCode,
+        });
+        if (res.status === 200) {
+          seterrorsms("");
+          sethideerrorsms(false);
+          toast.success("Code de réinitialisation correct.");
+          setActiveStep((prevActiveStep) => prevActiveStep + 1);
+        }
+      } catch (error) {
+        toast.error("Code de réinitialisation invalide.");
+        seterrorsms("Code de réinitialisation invalide.");
+        sethideerrorsms(true);
+        setActiveStep(1);
+        return;
+      }
     }
   };
   const handleBack = (): void => {
     setActiveStep((prevActiveStep) => prevActiveStep - 1);
+    seterrorsms("");
+    sethideerrorsms(false);
   };
 
   const handleStep = (step: number) => () => {

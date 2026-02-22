@@ -7,6 +7,8 @@ import vd from "../assets/Vd.mp4";
 import "../style/quiz.css";
 import connect from "../services/Util";
 import { useAuth } from "../services/AuthContextUser";
+import { set } from "date-fns";
+import { toast } from "react-toastify";
 const QuizAuto = () => {
   const [avatar, setavatar] = useState<string | null>(null);
   const [startquiz] = useState<boolean>(true);
@@ -114,6 +116,7 @@ const QuizAuto = () => {
     try {
       const formdata = new FormData();
       formdata.append("file", storefile);
+      setIsLoading(true);
       const res = await connect.post("/api/documents/", formdata);
       if (res.status === 201) {
         console.log("Document envoyé avec succès");
@@ -122,11 +125,16 @@ const QuizAuto = () => {
           state: {
             documentId: res.data.document.id,
             fileName: res.data.document.fileName,
+            isProcessing: true, //indique que le document est en cours de traitement
           },
         });
       }
     } catch (error) {
       console.error("Erreur lors de l'envoi du document:", error);
+      setIsLoading(false);
+      toast.error(
+        "Une erreur est survenue lors de l'envoi du document. Veuillez réessayer.",
+      );
     }
   };
   return (

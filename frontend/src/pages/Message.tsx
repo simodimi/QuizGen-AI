@@ -720,7 +720,38 @@ const Message = ({ usersend }: AmiProps) => {
   const isUserOnline = (userId: number) => {
     return onlineUsers.includes(userId);
   };
+  // Fonction pour formater la date
+  const formatDateSeparator = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
 
+    if (date.toDateString() === today.toDateString()) {
+      return "Aujourd'hui";
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return "Hier";
+    } else {
+      return date.toLocaleDateString("fr-FR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    }
+  };
+
+  // Fonction pour vérifier si on doit afficher un séparateur
+  const shouldShowDateSeparator = (
+    currentMessage: Message,
+    previousMessage: Message | undefined,
+  ) => {
+    if (!previousMessage) return true;
+
+    const currentDate = new Date(currentMessage.timestamp).toDateString();
+    const previousDate = new Date(previousMessage.timestamp).toDateString();
+
+    return currentDate !== previousDate;
+  };
   return (
     <div className="headerFriends">
       <div className="headerFriendsLeft">
@@ -783,42 +814,62 @@ const Message = ({ usersend }: AmiProps) => {
               </div>
             </div>
 
-            <div className="SmsMain">
+            <div
+              className="SmsMain"
+              style={{
+                backgroundImage: `url(${user?.background_image})`,
+                fontFamily: user?.policeStyle,
+              }}
+            >
               {currentMessages.map((p, index) => {
                 const iscurrentuser = p.senderId === user?.id;
+                const previousMessage =
+                  index > 0 ? currentMessages[index - 1] : undefined;
+                const showDateSeparator = shouldShowDateSeparator(
+                  p,
+                  previousMessage,
+                );
                 return (
-                  <div className="message-container" key={`${p.id}-${index}`}>
-                    {iscurrentuser ? (
-                      <div className="SmsMainContent">
-                        <div className="SmsHome">
-                          <p className={p.isEmojiOnly ? "emojiOnly" : ""}>
-                            {renderMessage(p.message)}
-                          </p>
-                          <span className="message-time">{p.time}</span>
-                        </div>
-                        <div className="message-status">
-                          <span
-                            className={`read-status ${p.isRead ? "read" : "unread"}`}
-                          >
-                            {p.isRead ? "✔️✔️" : "✔️"}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="SmsMainContentAway">
-                        <div className="SmsAway">
-                          <p className={p.isEmojiOnly ? "emojiOnly" : ""}>
-                            {renderMessage(p.message)}
-                          </p>
-                          <span className="message-time">{p.time}</span>
-                        </div>
-                        <div className="message-status">
-                          <span className="read-status">
-                            {p.isRead ? "✔️✔️" : "✔️"}
-                          </span>
-                        </div>
+                  <div className="" key={`${p.id}-${index}`}>
+                    {showDateSeparator && (
+                      <div className="date-separator">
+                        <span>{formatDateSeparator(p.timestamp)}</span>
                       </div>
                     )}
+
+                    <div className="message-container">
+                      {iscurrentuser ? (
+                        <div className="SmsMainContent">
+                          <div className="SmsHome">
+                            <p className={p.isEmojiOnly ? "emojiOnly" : ""}>
+                              {renderMessage(p.message)}
+                            </p>
+                            <span className="message-time">{p.time}</span>
+                          </div>
+                          <div className="message-status">
+                            <span
+                              className={`read-status ${p.isRead ? "read" : "unread"}`}
+                            >
+                              {p.isRead ? "✔️✔️" : "✔️"}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="SmsMainContentAway">
+                          <div className="SmsAway">
+                            <p className={p.isEmojiOnly ? "emojiOnly" : ""}>
+                              {renderMessage(p.message)}
+                            </p>
+                            <span className="message-time">{p.time}</span>
+                          </div>
+                          <div className="message-status">
+                            <span className="read-status">
+                              {p.isRead ? "✔️✔️" : "✔️"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -853,37 +904,6 @@ const Message = ({ usersend }: AmiProps) => {
           <div id="lauchtext">
             <p>Veuillez choisir un ami(e)s pour commencer la conversation.</p>
             <img src={logo} alt="Logo" />
-
-            {/* Section utilisateurs en ligne 
-            <div className="online-users-info">
-              <h3>Utilisateurs en ligne ({onlineUsers.length})</h3>
-              <div className="online-users-list">
-                {friends
-                  .filter((friend) => isUserOnline(friend.id))
-                  .map((friend) => (
-                    <div
-                      key={friend.id}
-                      className="online-friend-item"
-                      onClick={() => handleSelect(friend)}
-                    >
-                      <img
-                        src={friend.photo || "/default-avatar.png"}
-                        alt={friend.name}
-                      />
-                      <span>{friend.name} 🟢</span>
-                    </div>
-                  ))}
-                {friends.filter((friend) => isUserOnline(friend.id)).length ===
-                  0 && <p>Aucun ami en ligne pour le moment</p>}
-              </div>
-            </div>
-
-             Débug Socket.IO 
-            <div className="debug-info" style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
-              <p>Socket ID: {socket?.id || 'Non connecté'}</p>
-              <p>Utilisateur ID: {user?.id || 'Non connecté'}</p>
-              <p>Statut Socket: {socket?.connected ? '🟢 Connecté' : '🔴 Déconnecté'}</p>
-            </div>*/}
           </div>
         )}
       </div>

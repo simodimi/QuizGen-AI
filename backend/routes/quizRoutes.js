@@ -12,6 +12,8 @@ const {
   getUserQuizzes,
   cancelQuiz,
   detailQuiz,
+  saveQuizResult,
+  getQuizRanking,
 } = require("../controllers/quizController");
 
 // Génération de quiz
@@ -30,5 +32,6 @@ router.get("/details/:code", detailQuiz);
 
 // Quiz de l'utilisateur
 router.get("/user/all", getUserQuizzes);
-
+router.post("/classic/save-result", saveQuizResult);
+router.get("/ranking/:theme", getQuizRanking);
 module.exports = router;

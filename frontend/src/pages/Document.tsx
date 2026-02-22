@@ -7,6 +7,7 @@ import deletes from "../assets/icone/delete.png";
 import Button from "../components/ui/Button";
 import { useAuth } from "../services/AuthContextUser";
 import connect from "../services/Util";
+import { toast } from "react-toastify";
 interface DocumentItem {
   id: number;
   fileName: string; // Ajout
@@ -14,6 +15,14 @@ interface DocumentItem {
   createdAt: number;
   path?: string; // Optionnel
   size?: number;
+  isShared?: boolean;
+  ownership?: "owner" | "shared";
+  sharedBy?: {
+    id: number;
+    userName: string;
+    userPhoto: string;
+  };
+  sharedAt?: string;
 }
 const Document = () => {
   const [open, setOpen] = useState<boolean>(false);
@@ -57,6 +66,10 @@ const Document = () => {
             createdAt: new Date(doc.createdAt).getTime(),
             path: doc.path, // Si disponible
             size: doc.size,
+            isShared: doc.isShared || false,
+            ownership: doc.ownership || "owner",
+            sharedBy: doc.sharedBy,
+            sharedAt: doc.sharedAt,
           }));
           const uniqueDocs: DocumentItem[] = Array.from(
             new Map<string, DocumentItem>(
@@ -88,8 +101,11 @@ const Document = () => {
       if (res.status === 200) {
         const filtered = storeFile.filter((f) => f.id !== targetFile.id);
         setStoreFile(filtered);
-      } else {
-        console.error("Erreur lors de la suppression du document:", res);
+        if (res.data.wasShared) {
+          toast.success("Document retiré de votre liste");
+        } else {
+          toast.success("Document supprimé définitivement");
+        }
       }
     } catch (error) {
       console.error("Erreur lors de la suppression du document:", error);
@@ -129,7 +145,7 @@ const Document = () => {
     };
   }, [objectUrl]);
   return (
-    <div className="QuizHeader">
+    <div className="QuizHeaders">
       <div className="QuizHeaderBtn">
         <div className="QuizWord">
           {avatar && <img src={avatar} alt="avatar" />}

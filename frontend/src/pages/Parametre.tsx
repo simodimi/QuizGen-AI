@@ -22,6 +22,7 @@ import up from "../assets/para/up.png";
 import { useAuth } from "../services/AuthContextUser";
 import connect from "../services/Util";
 import { toast } from "react-toastify";
+import { set } from "date-fns";
 const Parametre = () => {
   const [picture, setpicture] = useState<string | null>(null);
   const [picturebg, setpicturebg] = useState<string | null>(null);
@@ -457,10 +458,12 @@ const Parametre = () => {
       return;
     }
     try {
-      await connect.put(`/api/users/${user?.id}/police`, {
+      const res = await connect.put(`/api/users/${user?.id}/police`, {
         policeStyle: policetexte,
       });
-
+      if (res.data.user) {
+        setUser(res.data.user);
+      }
       toast.success("Police mise à jour");
       handleback();
     } catch (error) {

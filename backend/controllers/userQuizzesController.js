@@ -5,6 +5,8 @@ const {
   Document,
   Question,
 } = require("../models/Association");
+const UserProgress = require("../models/UserProgress");
+const { sequelize } = require("../models/Association");
 const { Op } = require("sequelize");
 
 const getCreatedQuizzes = async (req, res) => {
@@ -513,7 +515,293 @@ const getUserQuizzesStats = async (req, res) => {
     });
   }
 };
+/*// 🔥 NOUVELLE FONCTION : Récupérer l'historique des quizzes
+const getUserQuizHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { type = "all", limit = 50, page = 1 } = req.query;
+    const offset = (page - 1) * limit;
 
+    // Construire la requête
+    let where = { userId, isGlobal: false };
+
+    if (type !== "all") {
+      where.quizType = type;
+    }
+
+    const { count, rows } = await UserProgress.findAndCountAll({
+      where,
+      include: [
+        {
+          model: Quiz,
+          as: "quiz",
+          required: true,
+          include: [
+            {
+              model: Document,
+              as: "document",
+              attributes: ["id", "fileName", "originalName"],
+            },
+            {
+              model: User,
+              as: "creator",
+              attributes: ["id", "userName", "userPhoto"],
+            },
+            {
+              model: QuizParticipant,
+              as: "participants",
+              required: false,
+              include: [
+                {
+                  model: User,
+                  as: "user",
+                  attributes: ["id", "userName", "userPhoto"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [["completedAt", "DESC"]],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
+
+    // Formater les données pour le frontend
+    const formattedHistory = rows.map((progress) => {
+      const quiz = progress.quiz;
+      const isMulti = quiz.mode === "multi";
+
+      // Trouver la participation de l'utilisateur dans ce quiz
+      const userParticipant = quiz.participants?.find(
+        (p) => p.userId === userId,
+      );
+
+      // Classement complet pour les multi
+      let ranking = [];
+      if (isMulti && quiz.participants) {
+        ranking = quiz.participants
+          .sort((a, b) => b.score - a.score)
+          .map((p, index) => ({
+            position: index + 1,
+            userId: p.userId,
+            userName: p.user?.userName || "Inconnu",
+            userPhoto: p.user?.userPhoto || "/default-avatar.png",
+            score: p.score,
+          }));
+      }
+
+      return {
+        id: progress.id,
+        quizId: quiz.id,
+        quizTitle: quiz.title,
+        quizType: progress.quizType,
+        mode: quiz.mode,
+        theme: quiz.theme,
+        score: progress.score,
+        totalQuestions: progress.totalQuestions,
+        percentage: progress.percentage,
+        position: progress.position,
+        completedAt: progress.completedAt,
+        document: quiz.document
+          ? {
+              id: quiz.document.id,
+              fileName: quiz.document.fileName,
+              originalName: quiz.document.originalName,
+            }
+          : null,
+        creator: quiz.creator
+          ? {
+              id: quiz.creator.id,
+              userName: quiz.creator.userName,
+              userPhoto: quiz.creator.userPhoto,
+            }
+          : null,
+        // Pour les multi, inclure tout le classement
+        ranking: ranking,
+        // La position de l'utilisateur dans le classement
+        userRank: userParticipant
+          ? ranking.findIndex((r) => r.userId === userId) + 1
+          : null,
+      };
+    });
+
+    // Récupérer aussi les stats globales
+    const globalStats = await UserProgress.findOne({
+      where: { userId, isGlobal: true },
+    });
+
+    res.json({
+      success: true,
+      history: formattedHistory,
+      globalStats: globalStats
+        ? {
+            totalGames: globalStats.totalGames,
+            totalScore: globalStats.totalScore,
+            averageScore: globalStats.averageScore,
+            bestScore: globalStats.bestScore,
+          }
+        : {
+            totalGames: 0,
+            totalScore: 0,
+            averageScore: 0,
+            bestScore: 0,
+          },
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        totalPages: Math.ceil(count / limit),
+        limit: parseInt(limit),
+      },
+    });
+  } catch (error) {
+    console.error("❌ Erreur getUserQuizHistory:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la récupération de l'historique",
+      error: error.message,
+    });
+  }
+};*/
+// Dans userQuizzesController.js - modifier getUserQuizHistory
+const getUserQuizHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { type = "all", limit = 50, page = 1 } = req.query;
+    const offset = (page - 1) * limit;
+
+    let where = { userId, isGlobal: false };
+    if (type !== "all") where.quizType = type;
+
+    const { count, rows } = await UserProgress.findAndCountAll({
+      where,
+      include: [
+        {
+          model: Quiz,
+          as: "quiz",
+          required: true,
+          include: [
+            {
+              model: Document,
+              as: "document",
+              attributes: ["id", "fileName"], // ⚠️ RETIRER originalName
+            },
+            {
+              model: User,
+              as: "creator",
+              attributes: ["id", "userName", "userPhoto"],
+            },
+            {
+              model: QuizParticipant,
+              as: "participants",
+              required: false,
+              include: [
+                {
+                  model: User,
+                  as: "user",
+                  attributes: ["id", "userName", "userPhoto"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [["completedAt", "DESC"]],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
+
+    // Formatter les données
+    const formattedHistory = rows.map((progress) => {
+      const quiz = progress.quiz;
+      const isMulti = quiz.mode === "multi";
+
+      const userParticipant = quiz.participants?.find(
+        (p) => p.userId === userId,
+      );
+
+      let ranking = [];
+      if (isMulti && quiz.participants) {
+        ranking = quiz.participants
+          .sort((a, b) => b.score - a.score)
+          .map((p, index) => ({
+            position: index + 1,
+            userId: p.userId,
+            userName: p.user?.userName || "Inconnu",
+            userPhoto: p.user?.userPhoto || "/default-avatar.png",
+            score: p.score,
+          }));
+      }
+
+      return {
+        id: progress.id,
+        quizId: quiz.id,
+        quizTitle: quiz.title,
+        quizType: progress.quizType,
+        mode: quiz.mode,
+        theme: quiz.theme,
+        score: progress.score,
+        totalQuestions: progress.totalQuestions,
+        percentage: progress.percentage,
+        position: progress.position,
+        completedAt: progress.completedAt,
+        document: quiz.document
+          ? {
+              id: quiz.document.id,
+              fileName: quiz.document.fileName,
+              originalName: quiz.document.fileName, // ⚠️ UTILISER fileName à la place
+            }
+          : null,
+        creator: quiz.creator
+          ? {
+              id: quiz.creator.id,
+              userName: quiz.creator.userName,
+              userPhoto: quiz.creator.userPhoto,
+            }
+          : null,
+        ranking: ranking,
+        userRank: userParticipant
+          ? ranking.findIndex((r) => r.userId === userId) + 1
+          : null,
+      };
+    });
+
+    // Calculer les stats globales
+    const globalStats = await UserProgress.findAll({
+      where: { userId },
+      attributes: [
+        [sequelize.fn("COUNT", sequelize.col("id")), "totalGames"],
+        [sequelize.fn("SUM", sequelize.col("score")), "totalScore"],
+        [sequelize.fn("AVG", sequelize.col("score")), "averageScore"],
+        [sequelize.fn("MAX", sequelize.col("score")), "bestScore"],
+      ],
+      raw: true,
+    });
+
+    res.json({
+      success: true,
+      history: formattedHistory,
+      globalStats: {
+        totalGames: parseInt(globalStats[0]?.totalGames) || 0,
+        totalScore: parseInt(globalStats[0]?.totalScore) || 0,
+        averageScore: parseFloat(globalStats[0]?.averageScore) || 0,
+        bestScore: parseInt(globalStats[0]?.bestScore) || 0,
+      },
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        totalPages: Math.ceil(count / limit),
+        limit: parseInt(limit),
+      },
+    });
+  } catch (error) {
+    console.error("❌ Erreur getUserQuizHistory:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la récupération de l'historique",
+    });
+  }
+};
 module.exports = {
   getCreatedQuizzes,
   getParticipatingQuizzes,
@@ -522,4 +810,5 @@ module.exports = {
   getCompletedQuizzes,
   getAllUserQuizzes,
   getUserQuizzesStats,
+  getUserQuizHistory,
 };

@@ -8,6 +8,7 @@ const {
   getCompletedQuizzes,
   getAllUserQuizzes,
   getUserQuizzesStats,
+  getUserQuizHistory,
 } = require("../controllers/userQuizzesController");
 
 router.get("/created", getCreatedQuizzes);
@@ -17,5 +18,6 @@ router.get("/active", getActiveQuizzes);
 router.get("/completed", getCompletedQuizzes);
 router.get("/all", getAllUserQuizzes);
 router.get("/stats", getUserQuizzesStats);
+router.get("/history", getUserQuizHistory);
 
 module.exports = router;

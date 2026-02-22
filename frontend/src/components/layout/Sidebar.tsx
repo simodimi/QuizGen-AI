@@ -16,7 +16,12 @@ const Sidebar = () => {
   const [select, setselect] = useState<string>("quiz");
   const location = useLocation();
   useEffect(() => {
-    if (location.pathname === "/home") setselect("quiz");
+    if (
+      location.pathname === "/home" ||
+      location.pathname.startsWith("/home/quiz") ||
+      location.pathname.startsWith("/home/multi")
+    )
+      setselect("quiz");
     if (location.pathname === "/home/ami") setselect("ami");
     if (location.pathname === "/home/document") setselect("doc");
     if (location.pathname === "/home/result") setselect("result");
@@ -93,19 +98,6 @@ const Sidebar = () => {
               <div className="SiderbarIcone">
                 <img src={img4} alt="" />
                 <p>Résultats</p>
-              </div>
-            </Link>
-          </div>
-          <div
-            className={`SiderbarTitle ${
-              select === "dash" ? "siderbaractive" : ""
-            }`}
-            onClick={() => setselect("dash")}
-          >
-            <Link to="/home/dashboard">
-              <div className="SiderbarIcone">
-                <img src={img5} alt="" />
-                <p>Dashboard</p>
               </div>
             </Link>
           </div>
@@ -195,19 +187,6 @@ const Sidebar = () => {
               <div className="SiderbarIcone">
                 <img src={img4} alt="" />
                 <p>Résultats</p>
-              </div>
-            </Link>
-          </div>
-          <div
-            className={`SiderbarTitle ${
-              select === "dash" ? "siderbaractive" : ""
-            }`}
-            onClick={() => setselect("dash")}
-          >
-            <Link to="/home/dashboard">
-              <div className="SiderbarIcone">
-                <img src={img5} alt="" />
-                <p>Dashboard</p>
               </div>
             </Link>
           </div>

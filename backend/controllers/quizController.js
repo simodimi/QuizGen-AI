@@ -5,6 +5,8 @@ const {
   Section,
   QuizParticipant,
   User,
+  UserProgress,
+  QuizAnswer,
   Friend,
 } = require("../models/Association");
 const { Op } = require("sequelize");
@@ -175,6 +177,7 @@ const generateQuizFromDocument = async (req, res) => {
 
     // 🔥 PASSER LA STRUCTURE AU SERVICE IA
     const aiResult = await aiQuizService.generateQuizFromText(context, {
+      documentId: document.id,
       questionCount: optimalQuestionCount,
       difficulty,
       documentType: documentType,
@@ -266,7 +269,71 @@ const generateQuizFromDocument = async (req, res) => {
       }
       await quiz.save();
     }
+    if (mode === "multi" && selectedFriends && selectedFriends.length > 0) {
+      const SharedDocument = require("../models/SharedDocument");
+
+      // Partager le document avec chaque ami sélectionné
+      for (const friendId of selectedFriends) {
+        await SharedDocument.findOrCreate({
+          where: {
+            documentId: document.id,
+            sharedWithId: friendId,
+          },
+          defaults: {
+            documentId: document.id,
+            ownerId: userId,
+            sharedWithId: friendId,
+            sharedViaQuizId: quiz.id,
+            sharedAt: new Date(),
+          },
+        });
+      }
+      console.log(`📤 Document partagé avec ${selectedFriends.length} ami(s)`);
+    }
     sendProgress(12, "✅ Quiz prêt et enregistré", 100);
+    // 🔥 ÉMISSION SOCKET POUR LA GÉNÉRATION TERMINÉE
+
+    setTimeout(() => {
+      try {
+        // Émettre via global.io
+        if (global.io) {
+          global.io.to(`user_${userId}`).emit("quiz:generation_complete", {
+            quizId: quiz.id,
+            title: title,
+            invitationCode: invitationCode,
+            questionCount: aiResult.questions.length,
+            mode: mode,
+            documentType: documentType,
+          });
+
+          console.log(
+            `📤 Événement generation_complete émis pour user_${userId}`,
+          );
+        }
+
+        // Émettre via le socket direct si possible
+        if (global.io && global.io.sockets) {
+          const sockets = global.io.sockets.sockets;
+          const userSocket = [...sockets.values()].find(
+            (socket) =>
+              socket.userId && socket.userId.toString() === userId.toString(),
+          );
+
+          if (userSocket) {
+            userSocket.emit("quiz:generation_complete", {
+              quizId: quiz.id,
+              title: title,
+              invitationCode: invitationCode,
+              questionCount: aiResult.questions.length,
+              mode: mode,
+              documentType: documentType,
+            });
+          }
+        }
+      } catch (socketError) {
+        console.error("❌ Erreur émission socket:", socketError);
+      }
+    }, 500);
     res.status(201).json({
       success: true,
       message: "Quiz généré avec succès",
@@ -312,7 +379,8 @@ const calculateOptimalQuestionCount = (text) => {
   console.log(`📊 Analyse document: ${wordCount} mots`);
 
   // 🔥 BEAUCOUP MOINS DE QUESTIONS POUR ALLER PLUS VITE
-  if (wordCount < 500) return 3; // Petit document
+  if (wordCount < 300) return 2; // Petit document
+  if (wordCount < 600) return 3; // Petit document
   if (wordCount < 1000) return 4; // Document moyen
   if (wordCount < 2000) return 5; // Document long
   if (wordCount < 4000) return 6; // Très long document (comme votre PDF)
@@ -424,6 +492,7 @@ const joinQuizByCode = async (req, res) => {
       message: "Vous avez rejoint le quiz",
       quizId: result.quiz.id,
       title: result.quiz.title,
+      creatorId: result.quiz.creator.id,
       creator: {
         id: result.quiz.creator.id,
         name: result.quiz.creator.userName,
@@ -457,7 +526,6 @@ const joinQuizByCode = async (req, res) => {
     });
   }
 };
-
 const startQuiz = async (req, res) => {
   try {
     const { id } = req.params;
@@ -788,6 +856,116 @@ const detailQuiz = async (req, res) => {
   }
 };
 
+const saveQuizResult = async (req, res) => {
+  try {
+    const { theme, score, totalQuestions } = req.body;
+    const userId = req.user.id;
+
+    const result = await quizService.saveClassicQuizResult(userId, {
+      theme,
+      score,
+      totalQuestions,
+    });
+
+    res.json({
+      success: true,
+      message: "Résultat sauvegardé",
+      ...result,
+    });
+  } catch (error) {
+    console.error("Erreur sauvegarde résultat classique:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la sauvegarde",
+    });
+  }
+};
+// quizController.js - Version corrigée
+// quizController.js - Version corrigée avec userId
+const getQuizRanking = async (req, res) => {
+  try {
+    const { theme } = req.params;
+    const userId = req.user?.id;
+
+    // Récupérer les 10 meilleurs scores pour ce thème
+    const ranking = await UserProgress.findAll({
+      where: {
+        quizType: "classic",
+        "$Quiz.theme$": theme,
+      },
+      include: [
+        {
+          model: Quiz,
+          as: "quiz", // ⚠️ DOIT CORRESPONDRE À L'ALIAS DANS L'ASSOCIATION
+          attributes: ["theme", "title"],
+          where: { theme: theme },
+          required: true,
+        },
+        {
+          model: User,
+          as: "user", // ⚠️ DOIT CORRESPONDRE À L'ALIAS DANS L'ASSOCIATION
+          attributes: ["id", "userName", "userPhoto"],
+        },
+      ],
+      order: [["score", "DESC"]],
+      limit: 10,
+      attributes: ["id", "score", "percentage", "completedAt", "userId"],
+    });
+
+    console.log(
+      "📊 Données brutes du classement:",
+      JSON.stringify(ranking, null, 2),
+    );
+
+    // Vérifions la structure des données
+    if (ranking.length > 0) {
+      console.log("🔍 Premier élément:", {
+        id: ranking[0].id,
+        userId: ranking[0].userId,
+        user: ranking[0].user
+          ? {
+              id: ranking[0].user.id,
+              userName: ranking[0].user.userName,
+            }
+          : null,
+      });
+    }
+
+    // Formater les résultats en incluant userId
+    const formattedRanking = ranking.map((entry, index) => {
+      // 🔥 S'assurer que userId est bien présent
+      const userEntry = {
+        id: entry.id,
+        pseudo: entry.user?.userName || "Anonyme",
+        score: entry.score,
+        theme: theme,
+        date: new Date(entry.completedAt).toLocaleDateString("fr-FR"),
+        photo: entry.user?.userPhoto || "/default-avatar.png",
+        position: index + 1,
+        // 🔥 CRUCIAL : Prendre userId soit de l'entrée, soit du user associé
+        userId: entry.userId || entry.user?.id || null,
+      };
+
+      console.log(`✅ Entrée ${index + 1}: userId = ${userEntry.userId}`);
+
+      return userEntry;
+    });
+
+    console.log("✅ Classement formaté avec userId:", formattedRanking);
+
+    res.json({
+      success: true,
+      ranking: formattedRanking,
+      total: ranking.length,
+    });
+  } catch (error) {
+    console.error("❌ Erreur getQuizRanking:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la récupération du classement",
+    });
+  }
+};
 module.exports = {
   generateQuizFromDocument,
   createPredefinedQuiz,
@@ -800,4 +978,6 @@ module.exports = {
   getUserQuizzes,
   cancelQuiz,
   detailQuiz,
+  saveQuizResult,
+  getQuizRanking,
 };

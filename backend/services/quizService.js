@@ -1,3 +1,4 @@
+// services/quizService.js
 const {
   Quiz,
   Question,
@@ -193,6 +194,74 @@ const submitAnswer = async (quizId, questionId, userId, answer, timeSpent) => {
   };
 };
 
+// 🔥 NOUVELLE VERSION de updateUserProgress
+const updateUserProgress = async (userId, data) => {
+  try {
+    const { quizId, score, position, totalQuestions, quizType } = data;
+
+    // Calculer le pourcentage
+    const percentage =
+      totalQuestions > 0
+        ? Math.round((score / totalQuestions) * 100 * 100) / 100
+        : 0;
+
+    // 1. Créer une entrée d'historique pour ce quiz
+    await UserProgress.create({
+      userId,
+      quizId,
+      score,
+      position: position || null,
+      totalQuestions,
+      percentage,
+      quizType: quizType || "ia-solo",
+      completedAt: new Date(),
+      isGlobal: false,
+    });
+
+    // 2. Mettre à jour OU créer les statistiques globales
+    let globalProgress = await UserProgress.findOne({
+      where: {
+        userId,
+        isGlobal: true,
+      },
+    });
+
+    if (globalProgress) {
+      // Mise à jour des stats existantes
+      globalProgress.totalGames += 1;
+      globalProgress.totalScore += score;
+      globalProgress.averageScore =
+        Math.round(
+          (globalProgress.totalScore / globalProgress.totalGames) * 100,
+        ) / 100;
+
+      if (score > globalProgress.bestScore) {
+        globalProgress.bestScore = score;
+      }
+
+      await globalProgress.save();
+    } else {
+      // Création des stats globales
+      await UserProgress.create({
+        userId,
+        isGlobal: true,
+        totalGames: 1,
+        totalScore: score,
+        averageScore: score,
+        bestScore: score,
+        quizId: null,
+      });
+    }
+
+    console.log(
+      `✅ Progression sauvegardée pour l'utilisateur ${userId}: ${score}/${totalQuestions} (${percentage}%)`,
+    );
+  } catch (error) {
+    console.error("❌ Erreur updateUserProgress:", error);
+    throw error;
+  }
+};
+
 const endQuiz = async (quizId, creatorId) => {
   const quiz = await Quiz.findByPk(quizId);
   if (!quiz || quiz.creatorId !== creatorId) {
@@ -228,8 +297,17 @@ const endQuiz = async (quizId, creatorId) => {
   quiz.winnerId = participants[0]?.userId || null;
   await quiz.save();
 
+  // 🔥 Sauvegarder la progression pour chaque participant
+  const quizType = quiz.mode === "solo" ? "ia-solo" : "ia-multi";
+
   for (const participant of participants) {
-    await updateUserProgress(participant.userId, participant.score);
+    await updateUserProgress(participant.userId, {
+      quizId: quiz.id,
+      score: participant.score,
+      position: participant.position,
+      totalQuestions: quiz.questionCount,
+      quizType,
+    });
   }
 
   return {
@@ -244,28 +322,49 @@ const endQuiz = async (quizId, creatorId) => {
   };
 };
 
-const updateUserProgress = async (userId, score) => {
-  const progress = await UserProgress.findOne({
-    where: { userId },
-  });
-  if (progress) {
-    progress.totalGames += 1;
-    progress.totalScore += score;
-    progress.averageScore = progress.totalScore / progress.totalGames;
-    if (score > progress.bestScore) {
-      progress.bestScore = score;
-    }
-    await progress.save();
-  } else {
-    await UserProgress.create({
-      userId,
-      totalGames: 1,
-      totalScore: score,
-      averageScore: score,
-      bestScore: score,
+// 🔥 NOUVELLE FONCTION pour les quizzes classiques (Quiz.tsx)
+const saveClassicQuizResult = async (userId, data) => {
+  try {
+    const { score, totalQuestions = 10, theme } = data;
+
+    // 1. Créer un quiz "classique" dans la table Quiz
+    const quiz = await Quiz.create({
+      title: `Quiz classique - ${theme}`,
+      creatorId: userId,
+      mode: "solo",
+      questionCount: totalQuestions,
+      status: "finished",
+      theme: theme,
+      isPredefined: true,
+      startedAt: new Date(),
+      finishedAt: new Date(),
     });
+
+    // 2. Créer une participation
+    await QuizParticipant.create({
+      quizId: quiz.id,
+      userId: userId,
+      score: score,
+      position: 1,
+      isReady: true,
+    });
+
+    // 3. Sauvegarder dans UserProgress
+    await updateUserProgress(userId, {
+      quizId: quiz.id,
+      score,
+      position: 1,
+      totalQuestions,
+      quizType: "classic",
+    });
+
+    return { success: true, quizId: quiz.id };
+  } catch (error) {
+    console.error("❌ Erreur saveClassicQuizResult:", error);
+    throw error;
   }
 };
+
 // Ajouter cette fonction dans quizService.js
 const enhanceQuizQuestions = (questions) => {
   return questions.map((q) => {
@@ -309,5 +408,6 @@ module.exports = {
   submitAnswer,
   endQuiz,
   updateUserProgress,
+  saveClassicQuizResult,
   enhanceQuizQuestions,
 };

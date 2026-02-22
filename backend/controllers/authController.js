@@ -306,19 +306,7 @@ const verifycode = async (req, res) => {
 //reset de mot de passe
 const resetPassword = async (req, res) => {
   try {
-    const { userEmail, userPassword, verificationToken } = req.body;
-    //verifier qu'un token valide existe pour cet email
-
-    const validToken = await verificationToken.findOne({
-      where: { userEmail, token: verificationToken, used: false },
-    });
-
-    if (!validToken) {
-      return res.status(400).json({ message: "Token invalide ou expiré" });
-    }
-
-    // Marquer le token comme utilisé
-    await validToken.update({ used: true });
+    const { userEmail, userPassword } = req.body;
     if (!userEmail || !userPassword) {
       return res
         .status(400)

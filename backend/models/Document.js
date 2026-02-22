@@ -15,10 +15,15 @@ const Document = sequelize.define("Document", {
   path: { type: DataTypes.STRING, allowNull: false }, //chemin du fichier sur le serveur
 
   shared: { type: DataTypes.BOOLEAN, defaultValue: false },
+  status: {
+    type: DataTypes.ENUM("processing", "ready", "ready_no_vector", "error"),
+    defaultValue: "processing",
+    allowNull: false,
+  }, // "processing", "ready", "error", "ready_no_vector"
   textPreview: {
     type: DataTypes.TEXT,
     allowNull: true,
-  }, //extrait de texte pour l'aperçu
+  }, //extrait de texte pour l'aperçu
   sectionCount: {
     type: DataTypes.INTEGER,
     defaultValue: 0,

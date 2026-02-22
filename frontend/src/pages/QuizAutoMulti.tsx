@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../style/quiz.css";
 import connect from "../services/Util";
@@ -14,6 +14,8 @@ import img1 from "../assets/icone/un.png";
 import img2 from "../assets/icone/deux.png";
 import img3 from "../assets/icone/trois.png";
 import img4 from "../assets/icone/oth.png";
+import a1 from "../assets/icone/logo.png";
+import { set } from "date-fns";
 interface Friend {
   id: number;
   name: string;
@@ -58,14 +60,63 @@ interface LeaderboardEntry {
   score: number;
   position?: number;
 }
-
+const StepItem = ({
+  step,
+  currentStep,
+  title,
+  done,
+}: {
+  step: number;
+  currentStep: number;
+  title: string;
+  done: boolean;
+}) => (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      opacity: done ? 1 : 0.7,
+    }}
+  >
+    <div
+      style={{
+        width: "24px",
+        height: "24px",
+        borderRadius: "50%",
+        backgroundColor: done
+          ? "#4caf50"
+          : currentStep === step
+            ? "#ff9800"
+            : "#ccc",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "white",
+        fontSize: "14px",
+      }}
+    >
+      {done ? "✓" : step}
+    </div>
+    <span
+      style={{
+        fontWeight: currentStep === step ? "bold" : "normal",
+        color: currentStep === step ? "#2196f3" : "inherit",
+      }}
+    >
+      {title}
+    </span>
+    {currentStep === step && (
+      <span style={{ marginLeft: "auto", color: "#ff9800" }}>⏳</span>
+    )}
+  </div>
+);
 const QuizAutoMulti: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
 
   // États principaux
-  const [step, setStep] = useState<number>(1);
   const [selectedFriends, setSelectedFriends] = useState<Friend[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [quizData, setQuizData] = useState<QuizData | null>(null);
@@ -81,6 +132,17 @@ const QuizAutoMulti: React.FC = () => {
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion | null>(
     null,
   );
+  const [isGenerating, setIsGenerating] = useState<boolean>(true); // Commence à true
+  const [progress, setProgress] = useState<number>(0);
+  const [progressMessage, setProgressMessage] =
+    useState<string>("Initialisation...");
+  const [progressStep, setProgressStep] = useState<number>(0);
+  const [generationTime, setGenerationTime] = useState<number>(0);
+  const [fileName, setFileName] = useState<string>("");
+  const [quizReady, setQuizReady] = useState<boolean>(false);
+
+  // États principaux
+  const [step, setStep] = useState<number>(0); // 0 = génération, 1 = sélection amis, 2 = salon, 3 = jeu, 4 = résultats
   const [selectedAnswer, setSelectedAnswer] = useState<
     string | string[] | null
   >(null);
@@ -112,18 +174,65 @@ const QuizAutoMulti: React.FC = () => {
       explanation: string;
     }>
   >([]);
+  const [isProcessing, setIsProcessing] = useState<boolean>(true); // Traitement en cours
+  const [processingProgress, setProcessingProgress] = useState<number>(0);
 
   // ✅ Récupérer le documentId depuis le state de navigation
   useEffect(() => {
+    // Récupérer le documentId depuis le state de navigation
     if (location.state) {
-      const { documentId: docId, fileName } = location.state as any;
+      const {
+        documentId: docId,
+        fileName,
+        isProcessing,
+      } = location.state as any;
       if (docId) {
         setDocumentId(docId);
+        setFileName(fileName || "document");
+        if (isProcessing) {
+          setIsProcessing(true);
+          setStep(0); // Afficher l'écran de génération
+        } else {
+          setIsProcessing(false);
+        }
         console.log("📄 Document ID reçu:", docId, fileName);
       }
     }
   }, [location]);
+  const startGeneration = useCallback(async () => {
+    if (!documentId) return;
 
+    console.log("🚀 Lancement de la génération pour document:", documentId);
+    setIsGenerating(true);
+    setStep(0);
+
+    try {
+      const response = await connect.post(`/api/quizzes/ai/${documentId}`, {
+        mode: "multi",
+        difficulty: "medium",
+        selectedFriends: [],
+      });
+
+      if (response.data.success) {
+        console.log("✅ Génération démarrée avec succès");
+      }
+    } catch (error) {
+      console.error("❌ Erreur génération:", error);
+      toast.error("Erreur lors de la génération");
+      setIsGenerating(false);
+    }
+  }, [documentId]);
+  // ✅ NOUVEAU useEffect pour lancer la génération
+  useEffect(() => {
+    if (documentId && !quizData && !isProcessing) {
+      console.log(
+        "🚀 Lancement automatique de la génération pour document:",
+        documentId,
+      );
+
+      startGeneration();
+    }
+  }, [documentId, quizData, isProcessing]);
   // Récupérer le code depuis l'URL
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -136,6 +245,8 @@ const QuizAutoMulti: React.FC = () => {
       setStep(2);
       setShowJoinDialog(false);
       setJoinedViaCode(true);
+      setIsGenerating(false);
+      setIsProcessing(false);
       if (socket && user) {
         handleJoinByCode(codeFromUrl);
       }
@@ -157,6 +268,81 @@ const QuizAutoMulti: React.FC = () => {
       console.log("✅ Socket connecté pour quiz multi");
       setIsConnected(true);
       newSocket.emit("join_user_room", user.id);
+      // Si on est un participant avec un code, rejoindre automatiquement
+      if (joinedViaCode && invitationCode) {
+        setTimeout(() => {
+          handleJoinByCode(invitationCode);
+        }, 500);
+      }
+    });
+    newSocket.on("document:indexed", (data) => {
+      const expectedDocId = location.state?.documentId;
+      console.log("📦 ÉVÉNEMENT REÇU - document:indexed:", data);
+      console.log("📦 documentId reçu:", data.documentId);
+      console.log("📦 documentId attendu:", expectedDocId);
+
+      if (data.documentId === expectedDocId) {
+        console.log("✅ CORRESPONDANCE TROUVÉE !");
+        setIsProcessing(false);
+        setProcessingProgress(100);
+        setDocumentId(data.documentId);
+        if (!quizData) {
+          console.log("🚀 Lancement de startGeneration()");
+          startGeneration();
+        }
+      } else {
+        console.log("❌ PAS DE CORRESPONDANCE");
+      }
+    });
+
+    newSocket.on("document:indexing_progress", (data) => {
+      console.log("📊 Progression indexation:", data);
+      setProcessingProgress(data.percent);
+    });
+    // 📊 PROGRESSION DE LA GÉNÉRATION
+    newSocket.on("quiz:generation_progress", (data) => {
+      console.log("📊 Progression génération multi:", data);
+      setProgressStep(data.step);
+      setProgressMessage(data.message);
+      setProgress(data.progress);
+    });
+
+    // ✅ FIN DE GÉNÉRATION
+    newSocket.on("quiz:generation_complete", (data) => {
+      console.log("✅ Génération terminée:", data);
+
+      const newQuizData = {
+        id: data.quizId,
+        title: data.title,
+        questions: [],
+        questionCount: data.questionCount || 0,
+        status: "waiting",
+        invitationCode: data.invitationCode,
+        creatorId: Number(user!.id),
+        documentId: documentId!,
+      };
+
+      setQuizData(newQuizData);
+      setInvitationCode(data.invitationCode);
+      setIsGenerating(false);
+      setQuizReady(true);
+
+      // ✅ Passer à l'étape 1 (sélection des amis)
+      setStep(1);
+
+      // Rejoindre la room
+      if (newSocket) {
+        newSocket.emit("join_quiz_room", { quizId: data.quizId });
+      }
+    });
+
+    // ❌ ERREUR DE GÉNÉRATION
+    newSocket.on("quiz:generation_error", (data) => {
+      console.error("❌ Erreur génération:", data);
+      toast.error(data.message);
+      setIsGenerating(false);
+      // En cas d'erreur, on peut retourner à l'accueil
+      setTimeout(() => navigate("/home"), 3000);
     });
 
     // 📌 RECEVOIR LES INFOS DU QUIZ
@@ -218,11 +404,12 @@ const QuizAutoMulti: React.FC = () => {
     // Dans le useEffect du socket, modifiez le handler quiz:answer_result
     newSocket.on("quiz:answer_result", (data) => {
       console.log("🎯 Résultat réponse:", data);
-      toast.success(
+      setExplanation(data.explanation);
+      /* toast.success(
         data.isCorrect
           ? `✅ Bonne réponse ! +${data.scoreEarned} points`
           : `❌ Mauvaise réponse.`,
-      );
+      );*/
 
       // ✅ AJOUT: Enregistrer la réponse de l'utilisateur
       if (currentQuestion) {
@@ -279,7 +466,6 @@ const QuizAutoMulti: React.FC = () => {
     newSocket.on("quiz:time_up", (data) => {
       console.log("⏰ Temps écoulé:", data);
       setTimeLeft(0);
-      toast.warning("⏰ Temps écoulé !");
     });
 
     // 📌 QUIZ TERMINÉ
@@ -351,14 +537,9 @@ const QuizAutoMulti: React.FC = () => {
         // ✅ REJOINDRE LA ROOM SOCKET
         socket.emit("join_quiz_room", { quizId });
         socket.emit("quiz:join_by_code", { invitationCode: code });
-
-        toast.success("✅ Vous avez rejoint le quiz!");
       }
     } catch (error: any) {
       console.error("❌ Erreur rejoindre quiz:", error);
-      toast.error(
-        error.response?.data?.message || "Impossible de rejoindre le quiz",
-      );
     }
   };
 
@@ -376,85 +557,41 @@ const QuizAutoMulti: React.FC = () => {
 
     socket.emit("quiz:player_ready", { quizId: quizData.id });
   };
-
-  // 🔥 GÉNÉRER QUIZ MULTI - AVEC DOCUMENTID DU STATE
   const generateMultiQuiz = async () => {
     if (selectedFriends.length === 0) {
       toast.error("Veuillez sélectionner au moins un ami");
       return;
     }
 
-    if (!documentId) {
-      toast.error("Aucun document trouvé");
-      navigate("/home/quiz/autoIA");
+    if (!quizData?.id) {
+      toast.info("Génération du quiz en cours, veuillez patienter...");
       return;
     }
 
     try {
-      const response = await connect.post(`/api/quizzes/ai/${documentId}`, {
-        mode: "multi",
-        difficulty: "medium",
-        selectedFriends: selectedFriends.map((f) => f.id),
-      });
+      setStep(2);
 
-      if (response.data.success) {
-        const quizId = response.data.quizId;
-        const code = response.data.invitationCode;
+      // ✅ Construction du lien avec le format startXXXquiz-IA
+      const invitationLink = `start${quizData.invitationCode}quiz-IA`;
 
-        // ✅ RÉCUPÉRER LE TITRE DEPUIS LE BACKEND
-        const title = `Quiz multi - ${response.data.documentType || "document"}`;
-
-        setQuizData({
-          id: quizId,
-          title: title,
-          questions: [],
-          questionCount: response.data.questionCount,
-          status: "waiting",
-          invitationCode: code,
-          creatorId: Number(user!.id),
-          documentId: documentId,
-        });
-
-        setInvitationCode(code);
-        setStep(2);
-        setIsCreator(true);
-
-        // Rejoindre la room
-        if (socket) {
-          socket.emit("join_quiz_room", { quizId });
-        }
-
-        /* // Inviter les amis
-        if (socket) {
-          socket.emit("quiz:invite_friends", {
-            quizId,
-            friendIds: selectedFriends.map((f) => f.id),
+      for (const friend of selectedFriends) {
+        try {
+          await connect.post("/api/messages", {
+            receiverId: friend.id,
+            content: `${user!.userName} vous invite à un quiz "${quizData.title}"!\n\nCliquez sur ce lien pour rejoindre:\n${invitationLink}`,
+            messageType: "quiz_invitation",
           });
-        }*/
-
-        const invitationLink = `start${code}quiz-IA`;
-
-        // Envoyer les messages
-        for (const friend of selectedFriends) {
-          try {
-            await connect.post("/api/messages", {
-              receiverId: friend.id,
-              content: `${user!.userName} vous invite à un quiz "${title}"!\n\nCliquez sur ce lien pour rejoindre:\n${invitationLink}`,
-              messageType: "quiz_invitation",
-            });
-          } catch (error) {
-            console.error(`Erreur envoi message à ${friend.name}:`, error);
-          }
+        } catch (error) {
+          console.error(`Erreur envoi message à ${friend.name}:`, error);
         }
-
-        toast.success("✅ Quiz créé! Les invitations ont été envoyées.");
       }
+
+      toast.success("✅ Invitations envoyées !");
     } catch (error) {
-      console.error("Erreur génération quiz:", error);
-      toast.error("Erreur lors de la création du quiz");
+      console.error("Erreur lors de l'envoi des invitations:", error);
+      toast.error("Erreur lors de l'envoi des invitations");
     }
   };
-
   // 🔥 DÉMARRER LE QUIZ
   const startQuiz = () => {
     if (!socket || !quizData || !isCreator) return;
@@ -555,6 +692,164 @@ const QuizAutoMulti: React.FC = () => {
       }
     });
   };
+  const renderProcessing = () => (
+    <div className="LoadingQuiz">
+      <img src={a1} alt="Traitement" />
+      <h1>Préparation du document en cours... 📄</h1>
+      <p>Fichier : "{fileName || "document"}"</p>
+      {processingProgress > 0 ? (
+        <div
+          className="progress-container"
+          style={{ width: "80%", margin: "20px auto" }}
+        >
+          <div
+            className="progress-bar-bg"
+            style={{
+              height: "30px",
+              backgroundColor: "#f0f0f0",
+              borderRadius: "15px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              className="progress-bar-fill"
+              style={{
+                width: `${processingProgress}%`,
+                height: "100%",
+                backgroundColor: "#4caf50",
+                transition: "width 0.3s ease-in-out",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "white",
+                fontWeight: "bold",
+              }}
+            >
+              {processingProgress > 10 && `${processingProgress}%`}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="spinner" style={{ margin: "20px auto" }}>
+          <div className="loading-spinner"></div>
+        </div>
+      )}
+      <p className="text-sm text-gray-500">
+        Indexation du document pour une meilleure qualité de quiz...
+      </p>
+    </div>
+  );
+  // 🔥 Rendu étape 0 - Génération
+  const renderGenerating = () => (
+    <div className="LoadingQuiz">
+      <img src={a1} alt="Chargement" />
+      <h1>Génération du quiz multi en cours... ⚡</h1>
+      <p>Document : "{fileName || "document"}"</p>
+
+      <div
+        className="progress-container"
+        style={{ width: "80%", margin: "20px auto" }}
+      >
+        <div
+          className="progress-bar-bg"
+          style={{
+            height: "30px",
+            backgroundColor: "#f0f0f0",
+            borderRadius: "15px",
+            overflow: "hidden",
+            position: "relative",
+          }}
+        >
+          <div
+            className="progress-bar-fill"
+            style={{
+              width: `${progress}%`,
+              height: "100%",
+              backgroundColor:
+                progress < 30
+                  ? "#ff9800"
+                  : progress < 70
+                    ? "#2196f3"
+                    : "#4caf50",
+              transition: "width 0.3s ease-in-out",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "white",
+              fontWeight: "bold",
+            }}
+          >
+            {progress > 10 && `${progress}%`}
+          </div>
+        </div>
+      </div>
+
+      <p
+        className="progress-message"
+        style={{
+          fontSize: "1.2rem",
+          margin: "15px 0",
+          color: "#666",
+          fontWeight: "bold",
+        }}
+      >
+        {progressMessage}
+      </p>
+
+      <div
+        className="loading-steps"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px",
+          width: "100%",
+          maxWidth: "400px",
+          margin: "20px auto",
+        }}
+      >
+        <StepItem
+          step={1}
+          currentStep={progressStep}
+          title="Extraction du texte"
+          done={progress > 20}
+        />
+        <StepItem
+          step={2}
+          currentStep={progressStep}
+          title="Analyse du contenu"
+          done={progress > 30}
+        />
+        <StepItem
+          step={3}
+          currentStep={progressStep}
+          title="Préparation du prompt"
+          done={progress > 40}
+        />
+        <StepItem
+          step={4}
+          currentStep={progressStep}
+          title="Génération IA"
+          done={progress > 60}
+        />
+        <StepItem
+          step={5}
+          currentStep={progressStep}
+          title="Création du salon"
+          done={progress > 80}
+        />
+        <StepItem
+          step={6}
+          currentStep={progressStep}
+          title="Quiz prêt !"
+          done={progress >= 100}
+        />
+      </div>
+
+      <p className="text-sm text-gray-500 mt-4">
+        ⏳ La génération peut prendre jusqu'à 3 minutes pour un document long
+      </p>
+    </div>
+  );
 
   // Rendu étape 1 - Sélection des amis
   const renderStep1 = () => (
@@ -1002,13 +1297,15 @@ const QuizAutoMulti: React.FC = () => {
       </div>
 
       <div className="quiz-content">
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
-        {step === 4 && renderStep4()}
+        {isProcessing && renderProcessing()}
+        {!isProcessing && isGenerating && renderGenerating()}
+        {!isProcessing && !isGenerating && step === 1 && renderStep1()}
+        {!isProcessing && !isGenerating && step === 2 && renderStep2()}
+        {!isProcessing && !isGenerating && step === 3 && renderStep3()}
+        {!isProcessing && !isGenerating && step === 4 && renderStep4()}
       </div>
 
-      {showJoinDialog && !isCreator && step === 1 && (
+      {showJoinDialog && !isCreator && !joinedViaCode && !isGenerating && (
         <Dialog open={true} onClose={() => setShowJoinDialog(false)}>
           <DialogContent>
             <DialogContentText>

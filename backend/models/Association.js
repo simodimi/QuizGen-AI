@@ -11,6 +11,7 @@ const QuizAnswer = require("./QuizAnswer");
 const Friend = require("./Friends");
 const Message = require("./Message");
 const UserProgress = require("./UserProgress");
+const SharedDocument = require("./SharedDocument");
 
 // Associations
 
@@ -174,10 +175,10 @@ Message.hasMany(Message, {
   as: "replies",
 });
 
-// User -> UserProgress (1:1)
-User.hasOne(UserProgress, {
+// User -> UserProgress (1:n)
+User.hasMany(UserProgress, {
   foreignKey: "userId",
-  as: "progress",
+  as: "progressHistory",
   onDelete: "CASCADE",
 });
 UserProgress.belongsTo(User, {
@@ -194,7 +195,64 @@ UserProgress.belongsTo(Quiz, {
   foreignKey: "quizId",
   as: "quiz",
 });
+// Document partagé avec d'autres utilisateurs
+Document.belongsToMany(User, {
+  through: SharedDocument,
+  as: "sharedWith",
+  foreignKey: "documentId",
+  otherKey: "sharedWithId",
+});
 
+User.belongsToMany(Document, {
+  through: SharedDocument,
+  as: "sharedDocuments",
+  foreignKey: "sharedWithId",
+  otherKey: "documentId",
+});
+
+// Relations directes
+SharedDocument.belongsTo(Document, {
+  foreignKey: "documentId",
+  as: "document",
+  onDelete: "CASCADE",
+});
+
+SharedDocument.belongsTo(User, {
+  foreignKey: "ownerId",
+  as: "originalOwner",
+  onDelete: "CASCADE",
+});
+
+SharedDocument.belongsTo(User, {
+  foreignKey: "sharedWithId",
+  as: "recipient",
+  onDelete: "CASCADE",
+});
+
+SharedDocument.belongsTo(Quiz, {
+  foreignKey: "sharedViaQuizId",
+  as: "quiz",
+  onDelete: "SET NULL",
+});
+
+// Relations inverses (optionnelles mais recommandées)
+Document.hasMany(SharedDocument, {
+  foreignKey: "documentId",
+  as: "shareRecords",
+  onDelete: "CASCADE",
+});
+
+User.hasMany(SharedDocument, {
+  foreignKey: "ownerId",
+  as: "ownedShares",
+  onDelete: "CASCADE",
+});
+
+User.hasMany(SharedDocument, {
+  foreignKey: "sharedWithId",
+  as: "receivedShares",
+  onDelete: "CASCADE",
+});
 module.exports = {
   sequelize,
   User,
@@ -207,4 +265,5 @@ module.exports = {
   Friend,
   Message,
   UserProgress,
+  SharedDocument,
 };

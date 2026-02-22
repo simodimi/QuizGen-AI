@@ -105,6 +105,11 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/my-quizzes", userQuizzesRoutes);
 
+// Initialiser Qdrant
+const { initializeCollection } = require("./config/qdrant");
+initializeCollection().catch((err) => {
+  console.error("⚠️ Erreur initialisation Qdrant:", err.message);
+});
 // 8. FICHIERS UPLOADÉS (protégés par auth via middleware personnalisé)
 const uploadsDir = path.join(__dirname, "uploads");
 app.use(
