@@ -674,7 +674,7 @@ const QuizAutoMulti: React.FC = () => {
 
   // Copier le code d'invitation
   const copyInvitationCode = () => {
-    const link = `${window.location.origin}/home/quiz/multi?code=${invitationCode}`;
+    const link = `start${invitationCode}quiz-IA`;
     navigator.clipboard
       .writeText(link)
       .then(() => toast.success("Lien copié!"))
@@ -929,9 +929,7 @@ const QuizAutoMulti: React.FC = () => {
         <div className="invitation-code">
           <h3>Lien d'invitation:</h3>
           <div className="code-display" onClick={copyInvitationCode}>
-            <span>
-              {window.location.origin}/home/multi?code={invitationCode}
-            </span>
+            <span>start{invitationCode}quiz-IA</span>
             <div className="code-display-copy">
               <Button className="accept">📋 Copier</Button>
             </div>

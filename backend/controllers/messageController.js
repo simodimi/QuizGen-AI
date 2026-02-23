@@ -409,14 +409,14 @@ const markAsRead = async (req, res) => {
 
     if (global.io) {
       // Informer l'expéditeur que ses messages ont été lus
-      global.io.to(`user_${senderId}`).emit("chat:conversation_read", {
+      global.io.to(`user_${senderId}`).emit("chat:messages_read", {
         readerId: userId,
         messageIds: readMessages.map((msg) => msg.id),
         readAt: new Date(),
       });
 
       // Informer le lecteur
-      global.io.to(`user_${userId}`).emit("chat:messages_marked_read", {
+      global.io.to(`user_${userId}`).emit("chat:conversation_read_success", {
         senderId,
         count: updatedCount,
       });

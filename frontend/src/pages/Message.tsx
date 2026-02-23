@@ -8,6 +8,7 @@ import connect from "../services/Util";
 import { useAuth } from "../services/AuthContextUser";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import { useSocket } from "../services/SocketContext";
 
 interface Message {
   id: number;
@@ -48,9 +49,6 @@ const Message = ({ usersend }: AmiProps) => {
   const [textesearch, settextesearch] = useState<string>("");
   const [userfilter, setuserfilter] = useState<Friends[]>([]);
   const [friends, setfriends] = useState<Friends[]>([]);
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [onlineUsers, setOnlineUsers] = useState<number[]>([]);
-  const [typingUsers, setTypingUsers] = useState<Record<number, boolean>>({});
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [typingTimeout, setTypingTimeout] = useState<ReturnType<
     typeof setTimeout
@@ -60,95 +58,14 @@ const Message = ({ usersend }: AmiProps) => {
   const { user } = useAuth();
   const currentMessages = selectUser !== null ? userSms[selectUser] || [] : [];
   const navigate = useNavigate();
+  const { socket, onlineUsers, typingUsers } = useSocket();
 
   // Initialisation Socket.IO
   useEffect(() => {
-    console.log("Initialisation Socket.IO...");
+    if (!socket) return;
 
-    // Initialiser Socket.IO
-    const newSocket = io("http://localhost:5000", {
-      withCredentials: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      query: {
-        userId: user?.id?.toString(),
-      },
-    });
-
-    setSocket(newSocket);
-
-    console.log("Socket créé avec ID:", newSocket.id);
-
-    // Écouter la connexion réussie
-    newSocket.on("connect", () => {
-      console.log("Socket connecté avec ID:", newSocket.id);
-
-      // Rejoindre la room utilisateur
-      if (user?.id) {
-        newSocket.emit("join_user_room", user.id);
-        console.log(`Utilisateur ${user.id} a rejoint sa room`);
-
-        // Demander les utilisateurs en ligne
-        newSocket.emit("get_online_users");
-      }
-    });
-
+    const newSocket = socket;
     // Écouter les nouveaux messages
-    /* newSocket.on("chat:receive", (newMessage: any) => {
-      console.log("Nouveau message reçu via Socket:", newMessage);
-
-      // Déterminer l'ID de la conversation
-      const conversationId =
-        newMessage.senderId === user?.id
-          ? newMessage.receiverId
-          : newMessage.senderId;
-
-      // Vérifier si c'est pour la conversation actuelle
-      if (conversationId === selectUser || !selectUser) {
-        // Formater le message
-        const formattedMessage = {
-          id: newMessage.id || Date.now(),
-          senderId: newMessage.senderId,
-          receiverId: newMessage.receiverId,
-          message: newMessage.content || newMessage.message,
-          time: new Date(newMessage.createdAt || Date.now()).toLocaleTimeString(
-            [],
-            {
-              hour: "2-digit",
-              minute: "2-digit",
-            },
-          ),
-          timestamp: new Date(newMessage.createdAt || Date.now()).getTime(),
-          isRead: newMessage.isRead || false,
-          isEmojiOnly: isEmojiOnly(newMessage.content || ""),
-        };
-
-        console.log(
-          "Message formaté pour conversation:",
-          conversationId,
-          formattedMessage,
-        );
-
-        // Ajouter le message à la conversation
-        setuserSms((prev) => {
-          const currentConv = prev[conversationId] || [];
-          const messageExists = currentConv.some(
-            (msg) => msg.id === formattedMessage.id,
-          );
-
-          if (messageExists) {
-            console.log("Message déjà présent, ignoré");
-            return prev;
-          }
-
-          return {
-            ...prev,
-            [conversationId]: [...currentConv, formattedMessage],
-          };
-        });
-      }
-    });*/
     newSocket.on("chat:receive", (newMessage: any) => {
       // 🔥 IGNORER les messages envoyés par moi-même
       if (newMessage.senderId === user?.id) return;
@@ -175,62 +92,8 @@ const Message = ({ usersend }: AmiProps) => {
       }));
     });
 
-    // Écouter les messages envoyés
-    newSocket.on("chat:sent", (message: any) => {
-      console.log("Message envoyé confirmé:", message);
-
-      if (message.receiverId === selectUser) {
-        const formattedMessage = {
-          id: message.id,
-          senderId: message.senderId,
-          receiverId: message.receiverId,
-          message: message.content,
-          time: new Date(message.createdAt).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          timestamp: new Date(message.createdAt).getTime(),
-          isRead: message.isRead,
-          isEmojiOnly: isEmojiOnly(message.content),
-        };
-
-        setuserSms((prev) => {
-          if (selectUser === null) return prev;
-          const currentConv = prev[selectUser] || [];
-          const messageExists = currentConv.some(
-            (msg) => msg.id === formattedMessage.id,
-          );
-
-          if (messageExists) return prev;
-
-          return {
-            ...prev,
-            [selectUser]: [...currentConv, formattedMessage],
-          };
-        });
-      }
-    });
-
     // Indicateur de frappe
-    /* newSocket.on(
-      "typing:status",
-      ({ userId, isTyping: typing }: { userId: number; isTyping: boolean }) => {
-
-        if (userId === selectUser) {
-          setTypingUsers((prev) => ({
-            ...prev,
-            [userId]: typing,
-          }));
-        }
-      },
-    );*/
-    newSocket.on("typing:status", ({ userId, isTyping }) => {
-      setTypingUsers((prev) => ({
-        ...prev,
-        [userId]: isTyping,
-      }));
-    });
-    newSocket.on("chat:conversation_read", ({ messageIds }) => {
+    /*newSocket.on("chat:conversation_read", ({ messageIds }) => {
       setuserSms((prev) => {
         const updated = { ...prev };
 
@@ -242,27 +105,34 @@ const Message = ({ usersend }: AmiProps) => {
 
         return updated;
       });
-    });
+    });*/
+    socket.on("chat:messages_read", ({ readerId, messageIds }) => {
+      console.log("Messages lus reçus:", { readerId, messageIds });
 
-    // Utilisateurs en ligne
-    newSocket.on("online_users", (users: number[]) => {
-      console.log("Liste des utilisateurs en ligne:", users);
-      setOnlineUsers(users);
-    });
+      setuserSms((prev) => {
+        const updated = { ...prev };
 
-    newSocket.on("user_online", (userId: number) => {
-      console.log(`Utilisateur ${userId} est maintenant en ligne`);
-      setOnlineUsers((prev) => {
-        if (!prev.includes(userId)) {
-          return [...prev, userId];
-        }
-        return prev;
+        // Mettre à jour tous les messages concernés
+        Object.keys(updated).forEach((convId) => {
+          updated[convId] = updated[convId].map((msg) => {
+            if (messageIds?.includes(msg.id)) {
+              return { ...msg, isRead: true };
+            }
+            return msg;
+          });
+        });
+
+        return updated;
       });
     });
 
-    newSocket.on("user_offline", (userId: number) => {
-      console.log(`Utilisateur ${userId} est maintenant hors ligne`);
-      setOnlineUsers((prev) => prev.filter((id) => id !== userId));
+    // Écouter la confirmation de lecture de conversation
+    socket.on("chat:conversation_read_success", ({ otherUserId }) => {
+      console.log("Conversation lue:", otherUserId);
+      // Recharger les messages ou mettre à jour localement
+      if (selectUser === otherUserId) {
+        loadsms(otherUserId);
+      }
     });
 
     // Notifications
@@ -295,9 +165,14 @@ const Message = ({ usersend }: AmiProps) => {
       if (typingTimeout) {
         clearTimeout(typingTimeout);
       }
-      newSocket.disconnect();
+      socket.off("chat:receive");
+      socket.off("chat:sent");
+      socket.off("chat:messages_read");
+      socket.off("chat:conversation_read_success");
+      socket.off("chat:notification");
+      socket.off("connect_error");
     };
-  }, [user?.id]);
+  }, [socket, user?.id, selectUser]);
 
   // Mettre à jour quand selectUser change
   useEffect(() => {
@@ -313,6 +188,40 @@ const Message = ({ usersend }: AmiProps) => {
   // Fonction pour marquer les messages comme lus
   const markMessageAsRead = async (senderId: number) => {
     try {
+      console.log("Marquage des messages comme lus pour:", senderId);
+
+      // Appel API
+      const response = await connect.post(`/api/messages/${senderId}/read`);
+      console.log("Réponse markAsRead:", response.data);
+
+      if (response.data.success) {
+        // Mettre à jour LOCALEMENT les messages comme lus
+        setuserSms((prev) => {
+          const updated = { ...prev };
+          const conversationMessages = updated[senderId] || [];
+
+          updated[senderId] = conversationMessages.map((msg) => ({
+            ...msg,
+            isRead: true, // Forcer isRead à true
+          }));
+
+          return updated;
+        });
+
+        // Émettre via socket
+        if (socket) {
+          socket.emit("chat:conversation_read", {
+            senderId,
+            readerId: user?.id,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Erreur markAsRead:", error);
+    }
+  };
+  /*const markMessageAsRead = async (senderId: number) => {
+    try {
       await connect.post(`/api/messages/${senderId}/read`);
       if (socket) {
         socket.emit("chat:conversation_read", { senderId });
@@ -320,7 +229,7 @@ const Message = ({ usersend }: AmiProps) => {
     } catch (error) {
       console.error("Erreur lors du marquage comme lu:", error);
     }
-  };
+  };*/
 
   // Chargement des messages
   const loadsms = async (id: number) => {
@@ -769,9 +678,14 @@ const Message = ({ usersend }: AmiProps) => {
             <>
               {getSortedMessages().map((p) => {
                 const unreadCount =
-                  userSms[p.id]?.filter(
-                    (msg) => !msg.isRead && msg.senderId === p.id,
-                  ).length || 0;
+                  userSms[p.id]?.filter((msg) => {
+                    // Message non lu ET c'est l'EXPÉDITEUR (pas moi)
+                    return (
+                      !msg.isRead &&
+                      msg.senderId === p.id &&
+                      msg.receiverId === user?.id
+                    );
+                  }).length || 0;
 
                 return (
                   <div
@@ -856,16 +770,16 @@ const Message = ({ usersend }: AmiProps) => {
                         </div>
                       ) : (
                         <div className="SmsMainContentAway">
+                          <div className="message-status">
+                            <span className="read-status">
+                              {p.isRead ? "✔️✔️" : "✔️"}
+                            </span>
+                          </div>
                           <div className="SmsAway">
                             <p className={p.isEmojiOnly ? "emojiOnly" : ""}>
                               {renderMessage(p.message)}
                             </p>
                             <span className="message-time">{p.time}</span>
-                          </div>
-                          <div className="message-status">
-                            <span className="read-status">
-                              {p.isRead ? "✔️✔️" : "✔️"}
-                            </span>
                           </div>
                         </div>
                       )}

@@ -28,6 +28,7 @@ import { AuthProviderUser } from "./services/AuthContextUser";
 import ProctectRouteUser from "./services/ProctectRouteUser";
 import QuizAutoSolo from "./pages/QuizAutoSolo";
 import QuizAutoMulti from "./pages/QuizAutoMulti";
+import { SocketProvider } from "./services/SocketContext";
 
 function App() {
   //const [countFriends, setcountFriends] = useState<number>(0);
@@ -50,37 +51,42 @@ function App() {
     <>
       <BrowserRouter>
         <AuthProviderUser>
-          <Routes>
-            <Route path="/" element={<Navigate to="/connexion" replace />} />
-            <Route path="/connexion" element={<Login />} />
-            <Route path="/inscription" element={<Register />} />
-            <Route path="/confirmation/:token" element={<ConfirmAccount />} />
-            <Route path="/wait" element={<Waiting />} />
-            <Route path="/mot-de-passe-oublie" element={<ForgetPassword />} />
+          <SocketProvider>
+            <Routes>
+              <Route path="/" element={<Navigate to="/connexion" replace />} />
+              <Route path="/connexion" element={<Login />} />
+              <Route path="/inscription" element={<Register />} />
+              <Route path="/confirmation/:token" element={<ConfirmAccount />} />
+              <Route path="/wait" element={<Waiting />} />
+              <Route path="/mot-de-passe-oublie" element={<ForgetPassword />} />
 
-            {/* Route protégée - SEULEMENT celle-ci est protégée */}
-            <Route
-              path="/home"
-              element={
-                <ProctectRouteUser>
-                  <Layout />
-                </ProctectRouteUser>
-              }
-            >
-              <Route index element={<Home />} />
-              <Route path="quiz/:theme" element={<Quiz />} />
-              <Route path="quiz/autoIA" element={<QuizAuto />} />
-              <Route path="ami" element={<Ami setusersend={setusersend} />} />
-              <Route path="document" element={<Document />} />
-              <Route path="result" element={<Result />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="parametre" element={<Parametre />} />
-              <Route path="message" element={<Message usersend={usersend} />} />
-              <Route path="solo" element={<QuizAutoSolo />} />
-              <Route path="multi" element={<QuizAutoMulti />} />
-            </Route>
-          </Routes>
-          <Notification />
+              {/* Route protégée - SEULEMENT celle-ci est protégée */}
+              <Route
+                path="/home"
+                element={
+                  <ProctectRouteUser>
+                    <Layout />
+                  </ProctectRouteUser>
+                }
+              >
+                <Route index element={<Home />} />
+                <Route path="quiz/:theme" element={<Quiz />} />
+                <Route path="quiz/autoIA" element={<QuizAuto />} />
+                <Route path="ami" element={<Ami setusersend={setusersend} />} />
+                <Route path="document" element={<Document />} />
+                <Route path="result" element={<Result />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="parametre" element={<Parametre />} />
+                <Route
+                  path="message"
+                  element={<Message usersend={usersend} />}
+                />
+                <Route path="solo" element={<QuizAutoSolo />} />
+                <Route path="multi" element={<QuizAutoMulti />} />
+              </Route>
+            </Routes>
+            <Notification />
+          </SocketProvider>
         </AuthProviderUser>
       </BrowserRouter>
     </>

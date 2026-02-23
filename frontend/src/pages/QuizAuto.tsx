@@ -15,12 +15,15 @@ const QuizAuto = () => {
   const [message] = useState<string>("");
   const [profil] = useState<boolean>(false);
   const selectfile = useRef<HTMLInputElement | null>(null);
+  const selectlink = useRef<HTMLInputElement | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [filelink, setfilelink] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [storefile, setstorefile] = useState<File | null>(null);
   const [step1, setstep1] = useState<boolean>(true);
   const [step2, setstep2] = useState<boolean>(false);
   const [step3, setstep3] = useState<boolean>(false);
+  const [step4, setstep4] = useState<boolean>(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const handleback = () => {
@@ -28,6 +31,7 @@ const QuizAuto = () => {
       setstep2(false);
       setstep1(true);
       setstep3(false);
+      setstep4(false);
     }
     if (step1) {
       navigate(-1);
@@ -36,6 +40,13 @@ const QuizAuto = () => {
       setstep3(false);
       setstep2(true);
       setstep1(false);
+      setstep4(false);
+    }
+    if (step4) {
+      setstep4(false);
+      setstep3(false);
+      setstep2(false);
+      setstep1(true);
     }
   };
 
@@ -43,6 +54,7 @@ const QuizAuto = () => {
     setstep2(true);
     setstep1(false);
     setstep3(false);
+    setstep4(false);
   };
 
   const handleselectAvatar = () => {
@@ -137,6 +149,58 @@ const QuizAuto = () => {
       );
     }
   };
+  const handlejoin = () => {
+    setstep4(true);
+    setstep3(false);
+    setstep2(false);
+    setstep1(false);
+  };
+  const handlechangevalue = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setfilelink(e.target.value);
+  };
+  const handlemodifylink = () => {
+    if (filelink) {
+      selectlink.current?.focus();
+    }
+  };
+  const handlenextjoin = async () => {
+    try {
+      if (!filelink || filelink.trim() === "") {
+        toast.error("Veuillez saisir un lien");
+        return;
+      }
+
+      const trimmedLink = filelink.trim();
+
+      // Format attendu: start4IH65Tquiz-IA
+      if (
+        !trimmedLink.startsWith("start") ||
+        !trimmedLink.includes("quiz-IA")
+      ) {
+        toast.error("Format invalide. Le lien doit être: startCODEquiz-IA");
+        return;
+      }
+
+      // Extraire le code
+      const code = trimmedLink.replace("start", "").replace("quiz-IA", "");
+
+      if (!code || code.length < 4) {
+        toast.error("Code invalide dans le lien");
+        return;
+      }
+
+      console.log("🎯 Connexion avec code:", code);
+
+      const res = await connect.post(`/api/quizzes/join/${code}`);
+
+      if (res.data.success) {
+        navigate(`/home/multi?code=${code}`);
+      }
+    } catch (error) {
+      toast.error("Lien erroné ou déjà utilisé");
+      console.error("Erreur:", error);
+    }
+  };
   return (
     <div className="QuizHeader">
       <div className="QuizHeaderBtn">
@@ -151,12 +215,21 @@ const QuizAuto = () => {
         )}
       </div>
       {step1 && (
-        <div className="QuizHeaderTitles">
-          <img src={a1} alt="" />
-          <h1>Hello {user?.userName}, tu veux générer ton propre quiz</h1>
-          <Button className="accept" onClick={handlestart}>
-            Allez suis moi 🤖
-          </Button>
+        <div className="flex gap-15">
+          <div className="QuizHeaderTitles">
+            <img src={a1} alt="" />
+            <h1>Hello {user?.userName}, tu veux générer ton propre quiz.</h1>
+            <Button className="accept" onClick={handlestart}>
+              Allez suis moi 🤖
+            </Button>
+          </div>
+          <div className="QuizHeaderTitles">
+            <img src={a1} alt="" />
+            <h1>Hello {user?.userName}, tu veux rejoindre une partie.</h1>
+            <Button className="retour" onClick={handlejoin}>
+              Allez c'est par ici 🤖
+            </Button>
+          </div>
         </div>
       )}
       {step2 && (
@@ -206,6 +279,38 @@ const QuizAuto = () => {
             <Button className="accept" onClick={handlemultiplay}>
               Jouer en mode multi
             </Button>
+          </div>
+        </div>
+      )}
+      {step4 && (
+        <div className="QuizHeaderVideo">
+          <div className="HomeHeaderVideoQuiz">
+            <video src={vd} loop autoPlay muted playsInline />
+          </div>
+          <div className="HomeHeaderFile">
+            <span className="flex-col gap-2">
+              <>veillez saisir le lien du fichier:</>
+              <input
+                className="text-center underline decoration-solid w-80 bg-gray-400"
+                type="text"
+                ref={selectlink}
+                onChange={handlechangevalue}
+                name="linkvalue"
+                id=""
+                placeholder="startXXXXXXquiz-IA"
+              />
+            </span>
+
+            {filelink && (
+              <div className="QuizHeaderIABtn">
+                <Button className="accept" onClick={handlemodifylink}>
+                  modifier le lien
+                </Button>
+                <Button className="retour" onClick={handlenextjoin}>
+                  rejoindre la partie
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
