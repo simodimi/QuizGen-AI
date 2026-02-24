@@ -1,4 +1,4 @@
-import { use, useState, type ChangeEvent, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import logo from "../assets/icone/quiz.png";
 import Button from "../components/ui/Button";
 import eye from "../assets/icone/ouvert.png";
@@ -9,10 +9,8 @@ import Step from "@mui/material/Step";
 import StepButton from "@mui/material/StepButton";
 import { Link, useNavigate } from "react-router-dom";
 import "../style/connexion.css";
-import { useAuth } from "../services/AuthContextUser";
 import connect from "../services/Util";
 import { toast } from "react-toastify";
-import { set } from "date-fns";
 
 const ForgetPassword = () => {
   interface FormData {
@@ -33,7 +31,7 @@ const ForgetPassword = () => {
   const [errorsms, seterrorsms] = useState<string>("");
   const [hideerrorsms, sethideerrorsms] = useState<boolean>(false);
   const [hidecheckpassword, sethidecheckpassword] = useState<boolean>(false);
-  const { user } = useAuth();
+
   const [formdata, setformdata] = useState<FormData>({
     userEmail: "",
     userPassword: "",

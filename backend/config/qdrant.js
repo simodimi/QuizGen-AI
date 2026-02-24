@@ -1,15 +1,3 @@
-/*//configuration de qdrant base de données vectorielle
-const { QdrantClient } = require("@qdrant/js-client-rest");
-require("dotenv").config();
-const VECTOR_COLLECTION = "document_sections"; //nom de la collection de stockage de vecteurs
-const qdrant = new QdrantClient({
-  url: process.env.QDRANT_URL,
-  apiKey: process.env.QDRANT_API_Key,
-});
-
-module.exports = { qdrant, VECTOR_COLLECTION };
-*/
-// config/qdrant.js
 const { QdrantClient } = require("@qdrant/js-client-rest");
 require("dotenv").config();
 
@@ -88,11 +76,24 @@ const getEmbedding = async (text) => {
       .map(() => Math.random() * 2 - 1);
   }
 };
-
+const countDocumentPoints = async (documentId) => {
+  try {
+    const result = await qdrant.count(COLLECTION_NAME, {
+      filter: {
+        must: [{ key: "documentId", match: { value: documentId } }],
+      },
+    });
+    return result.count;
+  } catch (error) {
+    console.error("❌ Erreur comptage points:", error.message);
+    return 0;
+  }
+};
 module.exports = {
   qdrant,
   COLLECTION_NAME,
   initializeCollection,
   getEmbedding,
   createDocumentIdIndex,
+  countDocumentPoints,
 };

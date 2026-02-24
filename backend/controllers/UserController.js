@@ -154,69 +154,6 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// Mettre à jour un user
-/*const updateUser = async (req, res) => {
-  try {
-    if (req.user.id !== req.params.id) {
-      return res.status(403).json({ message: "vous n'avez pas les droits" });
-    }
-
-    const updateData = {};
-    if (req.body.userName) updateData.userName = req.body.userName;
-    if (req.body.userPassword) {
-      updateData.userPassword = await bcrypt.hash(req.body.userPassword, 12);
-    }
-
-    // Gestion de l'avatar via le nouveau système
-    if (req.file && req.file.fieldname === "avatar") {
-      const user = await User.findByPk(req.params.id);
-
-      // Supprimer l'ancien avatar si personnalisé
-      await deleteOldAvatarIfExists(user);
-
-      updateData.userPhoto = `${req.protocol}://${req.get("host")}/uploads/avatars/${req.file.filename}`;
-      updateData.avatarType = "custom";
-      updateData.avatarFileName = req.file.filename;
-    }
-
-    // Pour rétrocompatibilité avec l'ancien système
-    if (req.file && req.file.fieldname === "userPhoto") {
-      const user = await User.findByPk(req.params.id);
-
-      // Supprimer l'ancien avatar si personnalisé
-      await deleteOldAvatarIfExists(user);
-
-      updateData.userPhoto = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-      updateData.avatarType = "custom";
-      updateData.avatarFileName = req.file.filename;
-    }
-
-    if (req.body.background_image) {
-      updateData.background_image = req.body.background_image;
-    }
-
-    const [updated] = await User.update(updateData, {
-      where: { id: req.params.id },
-    });
-
-    if (!updated) {
-      return res.status(500).json({ message: "utilisateur non mis à jour" });
-    }
-
-    // Récupérer le user mis à jour
-    const user = await User.findByPk(req.params.id, {
-      attributes: { exclude: ["userPassword", "validationToken"] },
-    });
-
-    return res.status(200).json({
-      message: "utilisateur mis à jour",
-      user,
-    });
-  } catch (error) {
-    console.log("erreur de mise à jour de l'utilisateur", error);
-    return res.status(500).json({ message: "erreur lors de la mise à jour" });
-  }
-};*/
 const updateUser = async (req, res) => {
   try {
     const userId = parseInt(req.params.id);

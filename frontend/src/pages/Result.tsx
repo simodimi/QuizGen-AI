@@ -110,13 +110,13 @@ const Result = () => {
       );
 
       if (response.data.success) {
-        console.log("📊 Historique reçu:", response.data.history);
+        console.log(" Historique reçu:", response.data.history);
         setHistory(response.data.history);
         setGlobalStats(response.data.globalStats);
         setPagination(response.data.pagination);
       }
     } catch (error) {
-      console.error("❌ Erreur chargement historique:", error);
+      console.error(" Erreur chargement historique:", error);
       toast.error("Impossible de charger l'historique");
     } finally {
       setLoading(false);
@@ -137,7 +137,7 @@ const Result = () => {
     }
   };
 
-  // ✅ Obtenir l'icône de médaille selon la position
+  //  Obtenir l'icône de médaille selon la position
   const getMedalIcon = (position: number) => {
     if (position === 1)
       return <img src={img1} alt="Or" className="medal-icon" />;
@@ -189,7 +189,7 @@ const Result = () => {
     }
   };
 
-  // ✅ Ouvrir les détails d'un quiz
+  //  Ouvrir les détails d'un quiz
   const openQuizDetails = (quiz: QuizHistoryItem) => {
     setSelectedQuiz(quiz);
     setOpenDialog(true);
@@ -329,7 +329,7 @@ const Result = () => {
                 )}
               </div>
 
-              {/* ✅ Classement pour les multi - Version améliorée */}
+              {/*  Classement pour les multi - Version améliorée */}
               {item.mode === "multi" &&
                 item.ranking &&
                 item.ranking.length > 0 && (
@@ -391,7 +391,7 @@ const Result = () => {
         </div>
       )}
 
-      {/* ✅ Dialog des détails complets - Version améliorée pour le multi */}
+      {/*  Dialog des détails complets - Version améliorée pour le multi */}
       <Dialog
         open={openDialog}
         onClose={() => setOpenDialog(false)}
@@ -449,7 +449,7 @@ const Result = () => {
                   )}
                 </div>
 
-                {/* ✅ Classement complet pour les multi - Version améliorée */}
+                {/*  Classement complet pour les multi - Version améliorée */}
                 {selectedQuiz.mode === "multi" &&
                   selectedQuiz.ranking &&
                   selectedQuiz.ranking.length > 0 && (

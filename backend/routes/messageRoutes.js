@@ -17,6 +17,7 @@ router.get("/conversation/:otherUserId", getConversation);
 router.delete("/:messageId", deleteMessage);
 router.get("/unread", getUnreadCount);
 router.post("/:senderId/read", markAsRead);
+router.put("/mark-as-read/:senderId", markAsRead);
 router.get("/:friendId/media", getMediaMessages);
 router.get("/:friendId/last-date", getLastConversationDate);
 

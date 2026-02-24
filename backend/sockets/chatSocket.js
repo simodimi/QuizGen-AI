@@ -34,7 +34,19 @@ module.exports = (io, socket) => {
           replyToId,
           isRead: false,
         });
+        // Après création du message
+        console.log(" Message créé avec ID:", message.id);
 
+        // Avant d'émettre
+        console.log("📢 Émission de chat:receive vers user_${toUserId}");
+        io.to(`user_${toUserId}`).emit("chat:receive", messageWithSender);
+
+        //  AJOUTER: Émettre la mise à jour du compteur non lu
+        io.to(`user_${toUserId}`).emit("chat:unread_incremented", {
+          fromUserId: socket.userId,
+          unreadCount: 1, // Vous pouvez calculer le nombre total si besoin
+        });
+        console.log(" Événements émis avec succès");
         // Récupérer le message complet avec l'expéditeur
         const messageWithSender = await Message.findByPk(message.id, {
           include: [
@@ -141,7 +153,7 @@ module.exports = (io, socket) => {
   // Marquer tous les messages d'une conversation comme lus
   socket.on("chat:read_conversation", async ({ otherUserId }) => {
     try {
-      await Message.update(
+      const [updatedCount] = await Message.update(
         {
           isRead: true,
           readAt: new Date(),
@@ -155,11 +167,40 @@ module.exports = (io, socket) => {
         },
       );
 
-      // Informer l'autre utilisateur
-      io.to(`user_${otherUserId}`).emit("chat:conversation_read", {
-        readBy: socket.userId,
-        readAt: new Date(),
-      });
+      if (updatedCount > 0) {
+        // Récupérer les IDs des messages lus
+        const readMessages = await Message.findAll({
+          where: {
+            senderId: otherUserId,
+            receiverId: socket.userId,
+            isRead: true,
+            readAt: { [Op.ne]: null },
+          },
+          attributes: ["id"],
+          limit: 50,
+          order: [["readAt", "DESC"]],
+        });
+
+        // Informer l'expéditeur que ses messages ont été lus
+        io.to(`user_${otherUserId}`).emit("chat:messages_read", {
+          readerId: socket.userId,
+          messageIds: readMessages.map((msg) => msg.id),
+          readAt: new Date(),
+        });
+
+        // Informer le lecteur que la conversation a été lue avec succès
+        socket.emit("chat:conversation_read_success", {
+          otherUserId,
+          count: updatedCount,
+        });
+
+        //  IMPORTANT: Émettre un événement pour mettre à jour le compteur global
+        io.emit("chat:unread_updated", {
+          userId: socket.userId,
+          conversationId: otherUserId,
+          unreadCount: 0,
+        });
+      }
 
       socket.emit("chat:conversation_read_success", { otherUserId });
     } catch (error) {

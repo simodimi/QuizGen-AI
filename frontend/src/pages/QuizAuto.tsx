@@ -7,7 +7,6 @@ import vd from "../assets/Vd.mp4";
 import "../style/quiz.css";
 import connect from "../services/Util";
 import { useAuth } from "../services/AuthContextUser";
-import { set } from "date-fns";
 import { toast } from "react-toastify";
 const QuizAuto = () => {
   const [avatar, setavatar] = useState<string | null>(null);
@@ -75,6 +74,21 @@ const QuizAuto = () => {
       setFileName(null);
       return;
     }
+    if (file.type !== "application/pdf" && !file.type.endsWith(".pdf")) {
+      toast.error("❌ Seuls les fichiers PDF sont acceptés pour le moment");
+      e.target.value = "";
+      setFileName(null);
+      setstorefile(null);
+      return;
+    }
+    //  Validation de la taille (optionnel - 10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("❌ Le fichier ne doit pas dépasser 10 Mo");
+      e.target.value = "";
+      setFileName(null);
+      setstorefile(null);
+      return;
+    }
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
@@ -105,8 +119,6 @@ const QuizAuto = () => {
       const res = await connect.post("/api/documents/", formdata);
       if (res.status === 201) {
         console.log("Document envoyé avec succès");
-
-        // ✅ STOCKER DANS LE STATE, PAS DANS LOCALSTORAGE
         // Naviguer vers la page QuizAutoSolo avec le documentId
         navigate("/home/solo", {
           state: {
@@ -124,7 +136,7 @@ const QuizAuto = () => {
       return;
     }
     //liste d'amis sélectionnés
-    const selectedFriends: Array<{ id: string; name: string }> = [];
+
     try {
       const formdata = new FormData();
       formdata.append("file", storefile);
@@ -240,7 +252,7 @@ const QuizAuto = () => {
           <div className="HomeHeaderFile">
             <span onClick={() => selectfile.current?.click()}>
               {!fileName && !isLoading && (
-                <div className="">cliquez ici pour ajouter un fichier</div>
+                <div className="">cliquez ici pour ajouter un fichier pdf</div>
               )}
               {isLoading && <p>chargement...</p>}
               {fileName && !isLoading && (
@@ -251,6 +263,7 @@ const QuizAuto = () => {
               type="file"
               ref={selectfile}
               onChange={handlechange}
+              accept=".pdf,application/pdf"
               name=""
               id=""
               style={{ display: "none" }}

@@ -159,7 +159,7 @@ const Ami = ({ setusersend }: AmiProps) => {
       setusering((prev) => {
         //si la demande est deja dans la liste ,on ne duplique pas
         if (prev.some((r) => r.requestId === data.requestId)) return prev;
-        toast.info(`Nouvelle demande d'amitié de ${data.sender.name}`);
+        // toast.info(`Nouvelle demande d'amitié de ${data.sender.name}`);
         return [
           {
             requestId: data.requestId,

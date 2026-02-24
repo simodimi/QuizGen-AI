@@ -19,7 +19,7 @@ const Document = sequelize.define("Document", {
     type: DataTypes.ENUM("processing", "ready", "ready_no_vector", "error"),
     defaultValue: "processing",
     allowNull: false,
-  }, // "processing", "ready", "error", "ready_no_vector"
+  },
   textPreview: {
     type: DataTypes.TEXT,
     allowNull: true,

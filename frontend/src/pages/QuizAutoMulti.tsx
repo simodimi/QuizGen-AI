@@ -15,7 +15,6 @@ import img2 from "../assets/icone/deux.png";
 import img3 from "../assets/icone/trois.png";
 import img4 from "../assets/icone/oth.png";
 import a1 from "../assets/icone/logo.png";
-import { set } from "date-fns";
 interface Friend {
   id: number;
   name: string;
@@ -137,7 +136,6 @@ const QuizAutoMulti: React.FC = () => {
   const [progressMessage, setProgressMessage] =
     useState<string>("Initialisation...");
   const [progressStep, setProgressStep] = useState<number>(0);
-  const [generationTime, setGenerationTime] = useState<number>(0);
   const [fileName, setFileName] = useState<string>("");
   const [quizReady, setQuizReady] = useState<boolean>(false);
 
@@ -177,7 +175,7 @@ const QuizAutoMulti: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState<boolean>(true); // Traitement en cours
   const [processingProgress, setProcessingProgress] = useState<number>(0);
 
-  // ✅ Récupérer le documentId depuis le state de navigation
+  // Récupérer le documentId depuis le state de navigation
   useEffect(() => {
     // Récupérer le documentId depuis le state de navigation
     if (location.state) {
@@ -195,7 +193,7 @@ const QuizAutoMulti: React.FC = () => {
         } else {
           setIsProcessing(false);
         }
-        console.log("📄 Document ID reçu:", docId, fileName);
+        console.log(" Document ID reçu:", docId, fileName);
       }
     }
   }, [location]);
@@ -222,11 +220,11 @@ const QuizAutoMulti: React.FC = () => {
       setIsGenerating(false);
     }
   }, [documentId]);
-  // ✅ NOUVEAU useEffect pour lancer la génération
+  //  lancer la génération
   useEffect(() => {
     if (documentId && !quizData && !isProcessing) {
       console.log(
-        "🚀 Lancement automatique de la génération pour document:",
+        "Lancement automatique de la génération pour document:",
         documentId,
       );
 
@@ -239,7 +237,7 @@ const QuizAutoMulti: React.FC = () => {
     const codeFromUrl = params.get("code");
 
     if (codeFromUrl) {
-      console.log("🔗 Code trouvé dans l'URL:", codeFromUrl);
+      console.log("Code trouvé dans l'URL:", codeFromUrl);
       setIsCreator(false);
       setInvitationCode(codeFromUrl);
       setStep(2);
@@ -265,7 +263,7 @@ const QuizAutoMulti: React.FC = () => {
     setSocket(newSocket);
 
     newSocket.on("connect", () => {
-      console.log("✅ Socket connecté pour quiz multi");
+      console.log("Socket connecté pour quiz multi");
       setIsConnected(true);
       newSocket.emit("join_user_room", user.id);
       // Si on est un participant avec un code, rejoindre automatiquement
@@ -277,39 +275,39 @@ const QuizAutoMulti: React.FC = () => {
     });
     newSocket.on("document:indexed", (data) => {
       const expectedDocId = location.state?.documentId;
-      console.log("📦 ÉVÉNEMENT REÇU - document:indexed:", data);
-      console.log("📦 documentId reçu:", data.documentId);
-      console.log("📦 documentId attendu:", expectedDocId);
+      console.log("ÉVÉNEMENT REÇU - document:indexed:", data);
+      console.log("documentId reçu:", data.documentId);
+      console.log("documentId attendu:", expectedDocId);
 
       if (data.documentId === expectedDocId) {
-        console.log("✅ CORRESPONDANCE TROUVÉE !");
+        console.log("CORRESPONDANCE TROUVÉE !");
         setIsProcessing(false);
         setProcessingProgress(100);
         setDocumentId(data.documentId);
         if (!quizData) {
-          console.log("🚀 Lancement de startGeneration()");
+          console.log("Lancement de startGeneration()");
           startGeneration();
         }
       } else {
-        console.log("❌ PAS DE CORRESPONDANCE");
+        console.log("PAS DE CORRESPONDANCE");
       }
     });
 
     newSocket.on("document:indexing_progress", (data) => {
-      console.log("📊 Progression indexation:", data);
+      console.log("Progression indexation:", data);
       setProcessingProgress(data.percent);
     });
-    // 📊 PROGRESSION DE LA GÉNÉRATION
+    // PROGRESSION DE LA GÉNÉRATION
     newSocket.on("quiz:generation_progress", (data) => {
-      console.log("📊 Progression génération multi:", data);
+      console.log("Progression génération multi:", data);
       setProgressStep(data.step);
       setProgressMessage(data.message);
       setProgress(data.progress);
     });
 
-    // ✅ FIN DE GÉNÉRATION
+    // FIN DE GÉNÉRATION
     newSocket.on("quiz:generation_complete", (data) => {
-      console.log("✅ Génération terminée:", data);
+      console.log(" Génération terminée:", data);
 
       const newQuizData = {
         id: data.quizId,
@@ -327,7 +325,7 @@ const QuizAutoMulti: React.FC = () => {
       setIsGenerating(false);
       setQuizReady(true);
 
-      // ✅ Passer à l'étape 1 (sélection des amis)
+      // Passer à l'étape 1 (sélection des amis)
       setStep(1);
 
       // Rejoindre la room
@@ -336,18 +334,18 @@ const QuizAutoMulti: React.FC = () => {
       }
     });
 
-    // ❌ ERREUR DE GÉNÉRATION
+    // ERREUR DE GÉNÉRATION
     newSocket.on("quiz:generation_error", (data) => {
-      console.error("❌ Erreur génération:", data);
+      console.error("Erreur génération:", data);
       toast.error(data.message);
       setIsGenerating(false);
       // En cas d'erreur, on peut retourner à l'accueil
       setTimeout(() => navigate("/home"), 3000);
     });
 
-    // 📌 RECEVOIR LES INFOS DU QUIZ
+    // RECEVOIR LES INFOS DU QUIZ
     newSocket.on("quiz:quiz_info", (data) => {
-      console.log("📋 Infos du quiz reçues:", data);
+      console.log("Infos du quiz reçues:", data);
       setQuizData((prev) => ({
         id: data.quizId,
         title: data.title,
@@ -378,24 +376,24 @@ const QuizAutoMulti: React.FC = () => {
 
     // 📌 DÉBUT D'UNE QUESTION - POUR TOUS LES JOUEURS
     newSocket.on("quiz:question_start", (data) => {
-      console.log("❓ Question démarrée:", data);
+      console.log("Question démarrée:", data);
 
-      // ✅ RÉINITIALISATION COMPLÈTE POUR TOUS LES JOUEURS
+      // RÉINITIALISATION COMPLÈTE POUR TOUS LES JOUEURS
       setShowCorrection(false);
       setCorrectAnswer(null);
       setExplanation("");
       setSelectedAnswer(null);
       setIsAnswerSubmitted(false);
 
-      // ✅ MÊME QUESTION POUR TOUT LE MONDE
+      //  MÊME QUESTION POUR TOUT LE MONDE
       setCurrentQuestion(data.question);
       setCurrentQuestionIndex(data.questionNumber);
       setTotalQuestions(data.totalQuestions);
 
-      // ✅ DÉMARRER LE TIMER POUR TOUS
+      //  DÉMARRER LE TIMER POUR TOUS
       startTimer(data.timeLimit);
 
-      // ✅ PASSER À L'ÉTAPE DU JEU POUR TOUS
+      //  PASSER À L'ÉTAPE DU JEU POUR TOUS
       setStep(3);
 
       toast.info(`Question ${data.questionNumber}/${data.totalQuestions}`);
@@ -405,13 +403,8 @@ const QuizAutoMulti: React.FC = () => {
     newSocket.on("quiz:answer_result", (data) => {
       console.log("🎯 Résultat réponse:", data);
       setExplanation(data.explanation);
-      /* toast.success(
-        data.isCorrect
-          ? `✅ Bonne réponse ! +${data.scoreEarned} points`
-          : `❌ Mauvaise réponse.`,
-      );*/
 
-      // ✅ AJOUT: Enregistrer la réponse de l'utilisateur
+      // AJOUT: Enregistrer la réponse de l'utilisateur
       if (currentQuestion) {
         setUserAnswers((prev) => {
           // Éviter les doublons
@@ -434,7 +427,7 @@ const QuizAutoMulti: React.FC = () => {
       }
     });
 
-    // 📌 MISE À JOUR DU CLASSEMENT EN DIRECT
+    // MISE À JOUR DU CLASSEMENT EN DIRECT
     newSocket.on("quiz:leaderboard_update", (data) => {
       console.log("🏆 Classement mis à jour:", data);
       setLeaderboard(data.leaderboard);
@@ -450,9 +443,9 @@ const QuizAutoMulti: React.FC = () => {
       );
     });
 
-    // 📌 AFFICHAGE AUTOMATIQUE DE LA CORRECTION
+    //  AFFICHAGE AUTOMATIQUE DE LA CORRECTION
     newSocket.on("quiz:show_correction", (data) => {
-      console.log("📚 Correction reçue:", data);
+      console.log("Correction reçue:", data);
       setShowCorrection(true);
       setCorrectAnswer(data.correctAnswer);
       setExplanation(data.explanation);
@@ -462,15 +455,15 @@ const QuizAutoMulti: React.FC = () => {
       }
     });
 
-    // 📌 TEMPS ÉCOULÉ
+    //  TEMPS ÉCOULÉ
     newSocket.on("quiz:time_up", (data) => {
       console.log("⏰ Temps écoulé:", data);
       setTimeLeft(0);
     });
 
-    // 📌 QUIZ TERMINÉ
+    //  QUIZ TERMINÉ
     newSocket.on("quiz:ended", (data) => {
-      console.log("🏁 Quiz terminé:", data);
+      console.log(" Quiz terminé:", data);
       setStep(4);
       setLeaderboard(data.leaderboard);
 
@@ -479,7 +472,7 @@ const QuizAutoMulti: React.FC = () => {
       }
     });
 
-    // 📌 ERREURS
+    //  ERREURS
     newSocket.on("quiz:join_error", (data) => {
       toast.error(data.message);
     });
@@ -489,7 +482,7 @@ const QuizAutoMulti: React.FC = () => {
     });
 
     newSocket.on("connect_error", (error) => {
-      console.error("❌ Erreur connexion Socket:", error);
+      console.error(" Erreur connexion Socket:", error);
       toast.error("Erreur de connexion au serveur");
     });
 
@@ -498,8 +491,32 @@ const QuizAutoMulti: React.FC = () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [user?.id, isCreator]);
+  // écouter les erreurs socket
+  useEffect(() => {
+    if (!socket) return;
 
-  // 🔥 REJOINDRE UN QUIZ
+    socket.on("quiz:join_error", (data) => {
+      if (data.code === "QUIZ_STARTED") {
+        toast.error("⏰ La partie a déjà commencé !");
+        // Rediriger ou réinitialiser
+        setStep(0);
+        setShowJoinDialog(true);
+      } else if (data.code === "ALREADY_JOINED") {
+        //toast.info("👋 Vous êtes déjà dans cette partie");
+        // Peut-être rediriger vers la salle d'attente
+        if (quizData?.id) {
+          setStep(2);
+        }
+      } else {
+        toast.error(data.message || "Erreur de connexion");
+      }
+    });
+
+    return () => {
+      socket.off("quiz:join_error");
+    };
+  }, [socket, quizData]);
+  //  REJOINDRE UN QUIZ
   const handleJoinByCode = async (code: string) => {
     if (!socket || !user) {
       toast.error("Connexion au serveur en cours...");
@@ -507,7 +524,7 @@ const QuizAutoMulti: React.FC = () => {
     }
 
     if (!code) {
-      toast.error("Code d'invitation invalide");
+      toast.error("Veuillez saisir un code");
       return;
     }
 
@@ -532,9 +549,8 @@ const QuizAutoMulti: React.FC = () => {
         setJoinedViaCode(true);
         setShowJoinDialog(false);
         setInvitationCode(code);
-        // setParticipants([]);
 
-        // ✅ REJOINDRE LA ROOM SOCKET
+        //  REJOINDRE LA ROOM SOCKET
         socket.emit("join_quiz_room", { quizId });
         socket.emit("quiz:join_by_code", { invitationCode: code });
       }
@@ -543,7 +559,7 @@ const QuizAutoMulti: React.FC = () => {
     }
   };
 
-  // 🔥 MARQUER COMME PRÊT
+  //  MARQUER COMME PRÊT
   const markAsReady = () => {
     if (!socket) {
       toast.error("Connexion au serveur perdue");
@@ -571,7 +587,7 @@ const QuizAutoMulti: React.FC = () => {
     try {
       setStep(2);
 
-      // ✅ Construction du lien avec le format startXXXquiz-IA
+      // Construction du lien avec le format startXXXquiz-IA
       const invitationLink = `start${quizData.invitationCode}quiz-IA`;
 
       for (const friend of selectedFriends) {
@@ -592,7 +608,7 @@ const QuizAutoMulti: React.FC = () => {
       toast.error("Erreur lors de l'envoi des invitations");
     }
   };
-  // 🔥 DÉMARRER LE QUIZ
+  //  DÉMARRER LE QUIZ
   const startQuiz = () => {
     if (!socket || !quizData || !isCreator) return;
 
@@ -605,7 +621,7 @@ const QuizAutoMulti: React.FC = () => {
     socket.emit("quiz:multi_start", { quizId: quizData.id });
   };
 
-  // 🔥 PASSER À LA QUESTION SUIVANTE (Créateur uniquement)
+  //  PASSER À LA QUESTION SUIVANTE (Créateur uniquement)
   const nextQuestion = () => {
     if (!socket || !quizData || !isCreator) return;
     socket.emit("quiz:next_question", { quizId: quizData.id });
@@ -618,7 +634,7 @@ const QuizAutoMulti: React.FC = () => {
     setIsAnswerSubmitted(false);
   };
 
-  // 🔥 SOUMETTRE UNE RÉPONSE
+  //  SOUMETTRE UNE RÉPONSE
   const submitAnswer = () => {
     if (
       !socket ||
@@ -739,7 +755,7 @@ const QuizAutoMulti: React.FC = () => {
       </p>
     </div>
   );
-  // 🔥 Rendu étape 0 - Génération
+  //  Rendu étape 0 - Génération
   const renderGenerating = () => (
     <div className="LoadingQuiz">
       <img src={a1} alt="Chargement" />
@@ -1147,7 +1163,7 @@ const QuizAutoMulti: React.FC = () => {
             </Button>
           ) : null}
 
-          {/* ✅ SEULEMENT UN BOUTON SUIVANT POUR LE CRÉATEUR */}
+          {/* SEULEMENT UN BOUTON SUIVANT POUR LE CRÉATEUR */}
           {isCreator && showCorrection && (
             <Button className="accept" onClick={nextQuestion}>
               {currentQuestionIndex < totalQuestions

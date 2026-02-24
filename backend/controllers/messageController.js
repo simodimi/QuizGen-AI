@@ -34,12 +34,12 @@ const sendMessage = async (req, res) => {
             {
               requesterId: senderId,
               addresseeId: receiverId,
-              status: "accepter", // Ton modèle utilise "accepter" pas "accepted"
+              status: "accepter",
             },
             {
               requesterId: receiverId,
               addresseeId: senderId,
-              status: "accepter", // Ton modèle utilise "accepter" pas "accepted"
+              status: "accepter",
             },
           ],
         },
@@ -87,23 +87,30 @@ const sendMessage = async (req, res) => {
       { where: { id: senderId } },
     );
 
-    // Émettre l'événement au destinataire
+    //  UN SEUL ÉVÉNEMENT POUR LE NOUVEAU MESSAGE
     emitMessageEvent("chat:receive", receiverId, {
       ...messageWithRelations.toJSON(),
       event: "new_message",
       timestamp: Date.now(),
     });
 
-    // Émettre l'événement à l'expéditeur
-    emitMessageEvent("chat:sent", senderId, {
-      ...messageWithRelations.toJSON(),
-      event: "message_sent",
-      status: "sent",
+    //  UN SEUL ÉVÉNEMENT POUR LE COMPTEUR GLOBAL
+    const totalUnreadForReceiver = await Message.count({
+      where: {
+        receiverId,
+        isRead: false,
+        isDeleted: false,
+      },
+    });
+
+    emitMessageEvent("chat:global_unread_update", receiverId, {
+      userId: receiverId,
+      totalUnread: totalUnreadForReceiver,
       timestamp: Date.now(),
     });
 
-    // Compter les messages non lus pour le destinataire
-    const unreadCount = await Message.count({
+    // Compter les messages non lus pour cette conversation spécifique
+    const unreadCountForConversation = await Message.count({
       where: {
         receiverId,
         senderId,
@@ -112,36 +119,10 @@ const sendMessage = async (req, res) => {
       },
     });
 
-    // Émettre une notification de nouveau message
-    emitMessageEvent("chat:notification", receiverId, {
-      senderId,
-      senderName: messageWithRelations.sender.userName,
-      senderPhoto: messageWithRelations.sender.userPhoto,
-      preview: content.length > 50 ? content.substring(0, 50) + "..." : content,
-      unreadCount,
-      messageId: message.id,
-      timestamp: Date.now(),
-    });
-
-    // Notifier les autres sockets que la conversation a été mise à jour
-    if (global.io) {
-      global.io.to(`user_${senderId}`).emit("chat:conversation_updated", {
-        friendId: receiverId,
-        lastMessage: content,
-        lastMessageTime: new Date(),
-      });
-
-      global.io.to(`user_${receiverId}`).emit("chat:conversation_updated", {
-        friendId: senderId,
-        lastMessage: content,
-        lastMessageTime: new Date(),
-      });
-    }
-
     res.status(201).json({
       success: true,
       message: messageWithRelations,
-      unreadCount,
+      unreadCount: unreadCountForConversation,
     });
   } catch (error) {
     console.error("Erreur envoi message:", error);
@@ -223,6 +204,21 @@ const getConversation = async (req, res) => {
           readerId: userId,
           messageIds: unreadMessages.map((msg) => msg.id),
         });
+
+        //  METTRE À JOUR LE COMPTEUR GLOBAL APRÈS LECTURE
+        const totalUnread = await Message.count({
+          where: {
+            receiverId: userId,
+            isRead: false,
+            isDeleted: false,
+          },
+        });
+
+        global.io.to(`user_${userId}`).emit("chat:global_unread_update", {
+          userId: userId,
+          totalUnread: totalUnread,
+          timestamp: Date.now(),
+        });
       }
     }
 
@@ -291,8 +287,12 @@ const deleteMessage = async (req, res) => {
         timestamp: Date.now(),
       };
 
-      emitMessageEvent("chat:message_deleted", message.senderId, emitData);
-      emitMessageEvent("chat:message_deleted", message.receiverId, emitData);
+      global.io
+        .to(`user_${message.senderId}`)
+        .emit("chat:message_deleted", emitData);
+      global.io
+        .to(`user_${message.receiverId}`)
+        .emit("chat:message_deleted", emitData);
     }
 
     res.json({
@@ -401,10 +401,10 @@ const markAsRead = async (req, res) => {
         receiverId: userId,
         isRead: true,
         readAt: { [Op.ne]: null },
-        updatedAt: { [Op.gte]: new Date(Date.now() - 10000) }, // Messages mis à jour il y a moins de 10 secondes
+        updatedAt: { [Op.gte]: new Date(Date.now() - 60000) },
       },
       attributes: ["id"],
-      limit: 10,
+      limit: 50,
     });
 
     if (global.io) {
@@ -415,10 +415,19 @@ const markAsRead = async (req, res) => {
         readAt: new Date(),
       });
 
-      // Informer le lecteur
-      global.io.to(`user_${userId}`).emit("chat:conversation_read_success", {
-        senderId,
-        count: updatedCount,
+      //  METTRE À JOUR LE COMPTEUR GLOBAL
+      const totalUnreadForUser = await Message.count({
+        where: {
+          receiverId: userId,
+          isRead: false,
+          isDeleted: false,
+        },
+      });
+
+      global.io.to(`user_${userId}`).emit("chat:global_unread_update", {
+        userId: userId,
+        totalUnread: totalUnreadForUser,
+        timestamp: Date.now(),
       });
     }
 
@@ -624,20 +633,6 @@ const setupMessageSocketHandlers = (io) => {
         io.to(`user_${receiverId}`).emit("message:status", {
           messageId,
           status: "delivered",
-          timestamp: Date.now(),
-        });
-      }
-    });
-
-    // Conversation lue
-    socket.on("chat:conversation_read", (data) => {
-      console.log("chat:conversation_read reçu:", data);
-      const { senderId } = data;
-
-      if (userId && senderId) {
-        io.to(`user_${senderId}`).emit("chat:messages_read", {
-          readerId: parseInt(userId),
-          senderId: parseInt(senderId),
           timestamp: Date.now(),
         });
       }

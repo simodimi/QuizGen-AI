@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useAuth } from "./AuthContextUser";
 import { toast } from "react-toastify";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 
 interface Props {
   children: React.ReactNode;

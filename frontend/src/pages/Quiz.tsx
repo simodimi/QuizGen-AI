@@ -1,4 +1,3 @@
-// Quiz.tsx - Version avec position basée sur le score de la partie en cours
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/ui/Button";
@@ -70,13 +69,13 @@ const Quiz = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [loadingRanking, setLoadingRanking] = useState<boolean>(false);
 
-  // 🔥 ID de la dernière partie jouée
+  //  ID de la dernière partie jouée
   const [lastGameId, setLastGameId] = useState<string | null>(null);
 
-  // 🔥 États pour la position
+  //  États pour la position
   const [userPosition, setUserPosition] = useState<number | null>(null);
 
-  // 🔥 États de debug
+  //  États de debug
   const [debugUserInfo, setDebugUserInfo] = useState<string>("");
   const [debugRankingInfo, setDebugRankingInfo] = useState<string>("");
 
@@ -84,7 +83,7 @@ const Quiz = () => {
   const questions = theme ? quizDatabase[theme] || [] : [];
   const isLastQuestion = current >= quizQuestions.length - 1;
 
-  // 🔥 Fonction pour calculer la position BASÉE SUR LE SCORE DE LA PARTIE EN COURS
+  //  Fonction pour calculer la position BASÉE SUR LE SCORE DE LA PARTIE EN COURS
   const calculatePositionForCurrentScore = (
     rankingData: ScoreEntry[],
     currentScore: number,
@@ -110,7 +109,7 @@ const Quiz = () => {
     );
     setDebugRankingInfo(`📊 Ranking IDs: [${rankingIds.join(", ")}]`);
 
-    // 🔥 Calculer la position basée sur le score actuel
+    //  Calculer la position basée sur le score actuel
     // Compter combien de personnes ont un score SUPÉRIEUR au score actuel
     const higherScores = rankingData.filter(
       (entry) => entry.score > currentScore,
@@ -120,12 +119,10 @@ const Quiz = () => {
     const position = higherScores + 1;
 
     setUserPosition(position);
-    console.log(
-      `✅ Position calculée pour ${currentScore} pts: ${position}ème`,
-    );
+    console.log(`Position calculée pour ${currentScore} pts: ${position}ème`);
   };
 
-  // 🔥 Charger le classement depuis la BDD
+  //  Charger le classement depuis la BDD
   const loadRankingFromDatabase = async () => {
     if (!theme) return;
 
@@ -150,7 +147,7 @@ const Quiz = () => {
         calculatePositionForCurrentScore(formattedRanking, finalScore);
       }
     } catch (error) {
-      console.error("❌ Erreur chargement classement:", error);
+      console.error("Erreur chargement classement:", error);
       const stored = localStorage.getItem("quizRanking");
       if (stored) {
         const localRanking = JSON.parse(stored);
@@ -165,7 +162,7 @@ const Quiz = () => {
     }
   };
 
-  // 🔥 Sauvegarder le score en BDD
+  //  Sauvegarder le score en BDD
   const saveScoreToDatabase = async (score: number) => {
     if (!user || isSaving) return;
 
@@ -183,13 +180,13 @@ const Quiz = () => {
 
         if (response.data.quizId) {
           setLastGameId(response.data.quizId.toString());
-          console.log("🎮 Dernière partie ID:", response.data.quizId);
+          console.log("Dernière partie ID:", response.data.quizId);
         }
 
         await loadRankingFromDatabase();
       }
     } catch (error) {
-      console.error("❌ Erreur sauvegarde score:", error);
+      console.error("Erreur sauvegarde score:", error);
       toast.error("Erreur lors de la sauvegarde du score");
 
       const newId = Date.now().toString();
@@ -454,7 +451,7 @@ const Quiz = () => {
             {Math.round((finalScore / quizQuestions.length) * 100)}%)
           </h2>
 
-          {/* 🔥 AFFICHAGE DE LA POSITION BASÉE SUR LE SCORE ACTUEL */}
+          {/*  AFFICHAGE DE LA POSITION BASÉE SUR LE SCORE ACTUEL */}
           {userPosition !== null && userPosition > 0 ? (
             <div
               className="text-center font-bold"

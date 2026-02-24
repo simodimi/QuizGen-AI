@@ -34,10 +34,25 @@ class VectorService {
     return chunks;
   }
 
-  // Indexer un document dans Qdrant
-  // vectorService.js - AJOUTER des émissions socket
+  // Remplacer COMPLÈTEMENT cette méthode
   static async indexDocument(documentId, text, metadata = {}) {
     try {
+      // Vérifier si déjà indexé pour éviter la double indexation
+      const exists = await this.checkDocumentIndexed(documentId);
+      if (exists) {
+        console.log(`📦 Document ${documentId} déjà indexé, skipping...`);
+
+        // Notifier quand même via socket que c'est déjà fait
+        if (global.io && metadata.userId) {
+          global.io.to(`user_${metadata.userId}`).emit("document:indexed", {
+            documentId,
+            sectionCount: 0, // On ne connaît pas le nombre exact
+            status: "already_indexed",
+          });
+        }
+        return 0;
+      }
+
       const chunks = this.chunkText(text);
       const points = [];
       const io = global.io;
@@ -86,6 +101,7 @@ class VectorService {
         io.to(`user_${userId}`).emit("document:indexed", {
           documentId,
           sectionCount: chunks.length,
+          status: "indexed",
         });
       }
 
@@ -99,6 +115,70 @@ class VectorService {
     }
   }
 
+  // Remplacer COMPLÈTEMENT cette méthode (optimisation)
+  static async getRandomChunks(documentId, count = 5) {
+    try {
+      // Vérifier d'abord si le document existe
+      const exists = await this.checkDocumentIndexed(documentId);
+      if (!exists) {
+        console.log(`⚠️ Document ${documentId} non indexé dans Qdrant`);
+        return [];
+      }
+
+      // OPTIMISATION : Compter d'abord pour savoir ce qu'on récupère
+      const countResult = await qdrant.count(COLLECTION_NAME, {
+        filter: {
+          must: [{ key: "documentId", match: { value: documentId } }],
+        },
+      });
+
+      if (countResult.count === 0) return [];
+
+      // Récupérer avec scroll mais limité intelligemment
+      const results = await qdrant.scroll(COLLECTION_NAME, {
+        filter: {
+          must: [{ key: "documentId", match: { value: documentId } }],
+        },
+        limit: Math.min(1000, countResult.count), // NE récupère que ce qui est nécessaire
+        with_payload: true,
+      });
+
+      const chunks = results.points.map((p) => ({
+        id: p.id,
+        content: p.payload.content,
+        order: p.payload.order,
+        wordCount: p.payload.wordCount,
+      }));
+
+      // Mélange de Fisher-Yates (plus aléatoire)
+      for (let i = chunks.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [chunks[i], chunks[j]] = [chunks[j], chunks[i]];
+      }
+
+      return chunks.slice(0, Math.min(count, chunks.length));
+    } catch (error) {
+      console.error("❌ Erreur récupération chunks:", error.message);
+      return [];
+    }
+  }
+  static async checkDocumentIndexed(documentId) {
+    try {
+      // Utiliser count au lieu de scroll (plus léger)
+      const { qdrant, COLLECTION_NAME } = require("../config/qdrant");
+
+      const result = await qdrant.count(COLLECTION_NAME, {
+        filter: {
+          must: [{ key: "documentId", match: { value: documentId } }],
+        },
+      });
+
+      return result.count > 0;
+    } catch (error) {
+      console.error("❌ Erreur vérification indexation:", error.message);
+      return false;
+    }
+  }
   // Rechercher des chunks similaires
   static async searchSimilar(documentId, query, limit = 5) {
     try {
@@ -125,38 +205,6 @@ class VectorService {
       }));
     } catch (error) {
       console.error("❌ Erreur recherche:", error);
-      return [];
-    }
-  }
-
-  // Obtenir des chunks aléatoires pour varier les questions
-  static async getRandomChunks(documentId, count = 5) {
-    try {
-      // Récupérer tous les chunks du document
-      const results = await qdrant.scroll(COLLECTION_NAME, {
-        filter: {
-          must: [
-            {
-              key: "documentId",
-              match: { value: documentId },
-            },
-          ],
-        },
-        limit: 1000,
-      });
-
-      const chunks = results.points.map((p) => ({
-        id: p.id,
-        content: p.payload.content,
-        order: p.payload.order,
-        wordCount: p.payload.wordCount,
-      }));
-
-      // Mélanger et prendre 'count' chunks
-      const shuffled = chunks.sort(() => 0.5 - Math.random());
-      return shuffled.slice(0, count);
-    } catch (error) {
-      console.error("❌ Erreur récupération chunks:", error);
       return [];
     }
   }

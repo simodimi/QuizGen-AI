@@ -22,7 +22,7 @@ import up from "../assets/para/up.png";
 import { useAuth } from "../services/AuthContextUser";
 import connect from "../services/Util";
 import { toast } from "react-toastify";
-import { set } from "date-fns";
+
 const Parametre = () => {
   const [picture, setpicture] = useState<string | null>(null);
   const [picturebg, setpicturebg] = useState<string | null>(null);
@@ -308,7 +308,7 @@ const Parametre = () => {
     setSelectedDefaultAvatar(p);
     setformdata({ ...formdata, userPhoto: null }); // on annule l'upload
   };
-  /* step 2**************** */
+  /* step 2*/
   const handlechoice2 = () => {
     setstartquiz(false);
     setchoicePara2(true);
@@ -386,7 +386,7 @@ const Parametre = () => {
     setformdata({ ...formdata, background_image: null });
   };
 
-  /* step 3**************** */
+  /* step 3*/
   const handlechoice3 = () => {
     setstartquiz(false);
     setchoicePara3(true);
@@ -405,7 +405,7 @@ const Parametre = () => {
   const handledeconnect = () => {
     logout();
   };
-  /* step 4**************** */
+  /* step 4 */
   const handlechoice4 = () => {
     setstartquiz(false);
     setchoicePara4(true);
@@ -433,7 +433,7 @@ const Parametre = () => {
     }
   };
 
-  /* step 5**************** */
+  /* step 5*/
   const handlechoice5 = () => {
     setstartquiz(false);
     setchoicePara5(true);
@@ -470,7 +470,7 @@ const Parametre = () => {
       console.error(error);
     }
   };
-  /* step 6**************** */
+  /* step 6 */
   const handlechoice6 = () => {
     setstartquiz(false);
     setchoicePara6(true);

@@ -43,7 +43,7 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    // ✅ Étape 1: Créer le document IMMÉDIATEMENT avec un statut "processing"
+    //   Créer le document IMMÉDIATEMENT avec un statut "processing"
     const document = await Document.create({
       userId,
       fileName: originalname,
@@ -55,7 +55,7 @@ const uploadDocument = async (req, res) => {
       status: "processing", // Vous devez ajouter ce champ à votre modèle Document
     });
 
-    // ✅ Étape 2: RÉPONDRE IMMÉDIATEMENT au frontend
+    //   RÉPONDRE IMMÉDIATEMENT au frontend
     res.status(201).json({
       message: "Document uploadé, traitement en cours",
       document: {
@@ -68,7 +68,7 @@ const uploadDocument = async (req, res) => {
       },
     });
 
-    // ✅ Étape 3: Lancer le traitement en ARRIÈRE-PLAN (sans await)
+    //   Lancer le traitement en ARRIÈRE-PLAN (sans await)
     (async () => {
       try {
         console.log(
@@ -99,7 +99,7 @@ const uploadDocument = async (req, res) => {
           });
           return;
         }
-
+        /*
         // Découpage en sections
         const sections = detectSections(textContent, 1500);
 
@@ -120,21 +120,64 @@ const uploadDocument = async (req, res) => {
           });
         });
         await Promise.all(sectionPromises);
+*/ const VectorService = require("../services/vectorService");
 
+        // Découper en chunks (même logique que vectorService)
+        const chunks = VectorService.chunkText(textContent, 500);
+
+        // Convertir chunks en sections
+        const sections = chunks.map((chunk, index) => ({
+          title: chunk.isTitle ? chunk.title : `Section ${index + 1}`,
+          content: chunk.content,
+          order: chunk.order || index + 1,
+          wordCount: chunk.wordCount,
+        }));
+
+        // Mise à jour du document
+        await document.update({
+          textPreview: textContent.substring(0, 500) + "...",
+          sectionCount: chunks.length, // ← MAINtenant c'est le BON nombre
+          status: "indexing", // ← Nouveau statut
+        });
+
+        // Création des sections (une seule requête bulk)
+        await Section.bulkCreate(
+          sections.map((s) => ({
+            ...s,
+            documentId: document.id,
+          })),
+        );
+
+        console.log(`📊 ${chunks.length} sections créées en base`);
         // Indexation Qdrant
         try {
-          const VectorService = require("../services/vectorService");
-          await VectorService.indexDocument(document.id, textContent, {
-            userId: document.userId,
-            fileName: document.fileName,
-          });
+          const isIndexed = await VectorService.checkDocumentIndexed(
+            document.id,
+          );
+          if (!isIndexed) {
+            await VectorService.indexDocument(document.id, textContent, {
+              userId: document.userId,
+              fileName: document.fileName,
+            });
+            console.log(`📤 Document ${document.id} indexé dans Qdrant`);
+          } else {
+            console.log(`📤 Document ${document.id} déjà indexé, skipping`);
+            // Notifier quand même
+            if (global.io) {
+              global.io.to(`user_${document.userId}`).emit("document:indexed", {
+                documentId: document.id,
+                sectionCount: document.sectionCount,
+                status: "already_indexed",
+              });
+            }
+          }
           console.log(`📤 Document ${document.id} indexé dans Qdrant`);
 
-          // ✅ Mettre à jour le statut
+          //  Mettre à jour le statut
           await document.update({ status: "ready" });
 
           console.log("========== VÉRIFICATION SOCKET ==========");
-          console.log("🔍 global.io existe ?", global.io ? "OUI ✅" : "NON ❌");
+          console.log("🔍 global.io existe ?", global.io ? "OUI " : "NON ❌");
           console.log("🔍 userId:", userId);
           console.log("🔍 document.id:", document.id);
           console.log("🔍 room:", `user_${userId}`);
@@ -151,7 +194,7 @@ const uploadDocument = async (req, res) => {
               });
 
             console.log(
-              "✅ Émission envoyée, résultat:",
+              " Émission envoyée, résultat:",
               result ? "OK" : "Échec",
             );
           } else {
@@ -166,7 +209,7 @@ const uploadDocument = async (req, res) => {
         }
 
         console.log(
-          `✅ Document ${document.id} traité avec succès (${sections.length} sections)`,
+          ` Document ${document.id} traité avec succès (${sections.length} sections)`,
         );
       } catch (error) {
         console.error(`❌ Erreur traitement document ${document.id}:`, error);
@@ -288,11 +331,11 @@ const getMyDocuments = async (req, res) => {
       sharedViaQuizId: doc.sharedWith?.[0]?.sharedDocument?.sharedViaQuizId,
     }));
 
-    // 5. Fusionner et trier par date
+    //  Fusionner et trier par date
     const allDocuments = [...formattedOwned, ...formattedShared];
     allDocuments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    // 6. Appliquer la pagination sur le résultat fusionné
+    //  Appliquer la pagination sur le résultat fusionné
     const total = allDocuments.length;
     const paginatedDocs = allDocuments.slice(offset, offset + parseInt(limit));
 

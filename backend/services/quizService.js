@@ -9,7 +9,7 @@ const UserProgress = require("../models/UserProgress");
 const QuizAnswer = require("../models/QuizAnswer");
 const { Op } = require("sequelize");
 
-// 🔥 Fonction utilitaire pour mélanger un tableau
+//  Fonction utilitaire pour mélanger un tableau
 const shuffleArray = (array) => {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -23,7 +23,7 @@ const createQuiz = async (quizData, questions = []) => {
   const quiz = await Quiz.create(quizData);
 
   const questionPromises = questions.map((q, index) => {
-    // 🔥 Mélanger les options si c'est un QCM
+    //  Mélanger les options si c'est un QCM
     let choices = q.choices || [];
     if (q.type === "qcm" && choices.length === 4) {
       // Sauvegarder la bonne réponse (inchangée)
@@ -194,7 +194,7 @@ const submitAnswer = async (quizId, questionId, userId, answer, timeSpent) => {
   };
 };
 
-// 🔥 NOUVELLE VERSION de updateUserProgress
+//  NOUVELLE VERSION de updateUserProgress
 const updateUserProgress = async (userId, data) => {
   try {
     const { quizId, score, position, totalQuestions, quizType } = data;
@@ -297,7 +297,7 @@ const endQuiz = async (quizId, creatorId) => {
   quiz.winnerId = participants[0]?.userId || null;
   await quiz.save();
 
-  // 🔥 Sauvegarder la progression pour chaque participant
+  //  Sauvegarder la progression pour chaque participant
   const quizType = quiz.mode === "solo" ? "ia-solo" : "ia-multi";
 
   for (const participant of participants) {
@@ -322,7 +322,7 @@ const endQuiz = async (quizId, creatorId) => {
   };
 };
 
-// 🔥 NOUVELLE FONCTION pour les quizzes classiques (Quiz.tsx)
+//  NOUVELLE FONCTION pour les quizzes classiques (Quiz.tsx)
 const saveClassicQuizResult = async (userId, data) => {
   try {
     const { score, totalQuestions = 10, theme } = data;

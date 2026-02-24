@@ -23,7 +23,7 @@ const corsOptions = {
   exposedHeaders: ["Set-Cookie"],
 };
 
-// 1. MIDDLEWARES DE BASE (ordre important)
+// MIDDLEWARES DE BASE (ordre important)
 app.use(compression());
 app.use(cors(corsOptions));
 app.use(
@@ -39,7 +39,7 @@ app.use(cookieParser());
 // Rate limiting (APIs uniquement)
 app.use("/api/", apiLimiter);
 
-// 2. FICHIERS STATIQUES PUBLIC AVANT AUTH
+// FICHIERS STATIQUES PUBLIC AVANT AUTH
 const publicDir = path.join(__dirname, "public");
 app.use(
   "/public",
@@ -60,7 +60,7 @@ app.use(
 );
 setTimeout(async () => {
   try {
-    console.log("🔍 Vérification d'Ollama en arrière-plan...");
+    console.log(" Vérification d'Ollama en arrière-plan...");
     const test = await ollamaService.test();
 
     if (test.success) {
@@ -68,17 +68,17 @@ setTimeout(async () => {
     } else {
       console.log("\n⚠️ Ollama n'est pas encore prêt");
       console.log(
-        "👉 Le serveur continuera à fonctionner, les quiz seront générés quand Ollama sera disponible",
+        " Le serveur continuera à fonctionner, les quiz seront générés quand Ollama sera disponible",
       );
     }
   } catch (error) {
     console.log("⚠️ Impossible de contacter Ollama pour le moment");
   }
 }, 5000); // Attendre 5 secondes avant de tester
-// 3. IMPORT DES MIDDLEWARES D'AUTH
+//  IMPORT DES MIDDLEWARES D'AUTH
 const { verifyToken } = require("./middlewares/authMiddleware");
 
-// 4. IMPORT DES ROUTES
+//  IMPORT DES ROUTES
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const documentRoutes = require("./routes/documentRoutes");
@@ -89,13 +89,13 @@ const messageRoutes = require("./routes/messageRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const userQuizzesRoutes = require("./routes/userQuizzesRoutes");
 
-// 5. ROUTES SANS AUTHENTIFICATION
+//  ROUTES SANS AUTHENTIFICATION
 app.use("/api/auth", authRoutes);
 
-// 6. MIDDLEWARE D'AUTHENTIFICATION GLOBAL POUR LES AUTRES ROUTES
+//  MIDDLEWARE D'AUTHENTIFICATION GLOBAL POUR LES AUTRES ROUTES
 app.use("/api", verifyToken);
 
-// 7. ROUTES PROTÉGÉES (après verifyToken)
+//  ROUTES PROTÉGÉES (après verifyToken)
 app.use("/api/users", userRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/quizzes", quizRoutes);
@@ -110,13 +110,12 @@ const { initializeCollection } = require("./config/qdrant");
 initializeCollection().catch((err) => {
   console.error("⚠️ Erreur initialisation Qdrant:", err.message);
 });
-// 8. FICHIERS UPLOADÉS (protégés par auth via middleware personnalisé)
+//  FICHIERS UPLOADÉS (protégés par auth via middleware personnalisé)
 const uploadsDir = path.join(__dirname, "uploads");
 app.use(
   "/uploads",
   (req, res, next) => {
     // Vérifier si l'utilisateur est authentifié pour les uploads
-    // ou permettre les avatars publics
     if (req.path.startsWith("/avatars/") && req.path.includes("default")) {
       // Autoriser les avatars par défaut
       next();
@@ -130,7 +129,7 @@ app.use(
   }),
 );
 
-// 9. AVATARS UPLOADÉS (spécifique)
+//  AVATARS UPLOADÉS (spécifique)
 const customAvatarDir = path.join(__dirname, "uploads", "avatars");
 app.use(
   "/uploads/avatars",
@@ -140,7 +139,7 @@ app.use(
   }),
 );
 
-// 10. SETUP SOCKET.IO
+//  SETUP SOCKET.IO
 const io = new Server(server, {
   cors: {
     origin: CLIENT_ORIGIN,
@@ -241,7 +240,7 @@ setupQuizSocketHandlers(io);
 // Export io globalement
 global.io = io;
 
-// 11. GESTION DES ERREURS 404
+//  GESTION DES ERREURS 404
 app.use((req, res, next) => {
   res.status(404).json({
     message: "Route non trouvée",
@@ -250,7 +249,7 @@ app.use((req, res, next) => {
   });
 });
 
-// 12. MIDDLEWARE DE GESTION D'ERREURS GLOBAL
+//  MIDDLEWARE DE GESTION D'ERREURS GLOBAL
 app.use((err, req, res, next) => {
   console.error("Erreur serveur:", err.stack);
 
@@ -275,7 +274,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 13. DÉMARRAGE DU SERVEUR
+//  DÉMARRAGE DU SERVEUR
 sequelize
   .sync()
   .then(() => {

@@ -65,7 +65,7 @@ const generateQuizFromDocument = async (req, res) => {
 
     const documentStructure = analyzeDocumentStructure(context);
 
-    // 🔥 DÉTECTION DU TYPE DE DOCUMENT
+    //  DÉTECTION DU TYPE DE DOCUMENT
     let documentType = "general";
     const fileName = document.fileName?.toLowerCase() || "";
     const sampleText = context.substring(0, 500).toLowerCase();
@@ -175,7 +175,7 @@ const generateQuizFromDocument = async (req, res) => {
       25,
     );
 
-    // 🔥 PASSER LA STRUCTURE AU SERVICE IA
+    //  PASSER LA STRUCTURE AU SERVICE IA
     const aiResult = await aiQuizService.generateQuizFromText(context, {
       documentId: document.id,
       questionCount: optimalQuestionCount,
@@ -291,7 +291,7 @@ const generateQuizFromDocument = async (req, res) => {
       console.log(`📤 Document partagé avec ${selectedFriends.length} ami(s)`);
     }
     sendProgress(12, "✅ Quiz prêt et enregistré", 100);
-    // 🔥 ÉMISSION SOCKET POUR LA GÉNÉRATION TERMINÉE
+    //  ÉMISSION SOCKET POUR LA GÉNÉRATION TERMINÉE
 
     setTimeout(() => {
       try {
@@ -378,7 +378,7 @@ const calculateOptimalQuestionCount = (text) => {
 
   console.log(`📊 Analyse document: ${wordCount} mots`);
 
-  // 🔥 BEAUCOUP MOINS DE QUESTIONS POUR ALLER PLUS VITE
+  //  BEAUCOUP MOINS DE QUESTIONS POUR ALLER PLUS VITE
   if (wordCount < 300) return 2; // Petit document
   if (wordCount < 600) return 3; // Petit document
   if (wordCount < 1000) return 4; // Document moyen
@@ -484,7 +484,38 @@ const createPredefinedQuiz = async (req, res) => {
 const joinQuizByCode = async (req, res) => {
   try {
     const { code } = req.params;
+    //Chercher le quiz AVANT d'appeler le service
+    const quiz = await Quiz.findOne({
+      where: {
+        invitationCode: code,
+        status: "waiting",
+      },
+      include: [{ model: User, as: "creator" }],
+    });
 
+    // Si le quiz n'existe pas OU a déjà commencé
+    if (!quiz) {
+      return res.status(400).json({
+        success: false,
+        message: "❌ Ce code n'est plus valide - La partie a déjà commencé !",
+      });
+    }
+
+    // Vérifier si l'utilisateur est déjà participant
+    const existingParticipant = await QuizParticipant.findOne({
+      where: {
+        quizId: quiz.id,
+        userId: req.user.id,
+      },
+    });
+
+    if (existingParticipant) {
+      return res.status(400).json({
+        success: false,
+        message: "Vous êtes déjà dans cette partie",
+      });
+    }
+    //si tout se passe bien
     const result = await quizService.joinQuizByCode(code, req.user.id);
 
     res.json({
@@ -880,8 +911,6 @@ const saveQuizResult = async (req, res) => {
     });
   }
 };
-// quizController.js - Version corrigée
-// quizController.js - Version corrigée avec userId
 const getQuizRanking = async (req, res) => {
   try {
     const { theme } = req.params;
@@ -896,14 +925,14 @@ const getQuizRanking = async (req, res) => {
       include: [
         {
           model: Quiz,
-          as: "quiz", // ⚠️ DOIT CORRESPONDRE À L'ALIAS DANS L'ASSOCIATION
+          as: "quiz",
           attributes: ["theme", "title"],
           where: { theme: theme },
           required: true,
         },
         {
           model: User,
-          as: "user", // ⚠️ DOIT CORRESPONDRE À L'ALIAS DANS L'ASSOCIATION
+          as: "user",
           attributes: ["id", "userName", "userPhoto"],
         },
       ],
@@ -933,7 +962,7 @@ const getQuizRanking = async (req, res) => {
 
     // Formater les résultats en incluant userId
     const formattedRanking = ranking.map((entry, index) => {
-      // 🔥 S'assurer que userId est bien présent
+      //  S'assurer que userId est bien présent
       const userEntry = {
         id: entry.id,
         pseudo: entry.user?.userName || "Anonyme",
@@ -942,7 +971,7 @@ const getQuizRanking = async (req, res) => {
         date: new Date(entry.completedAt).toLocaleDateString("fr-FR"),
         photo: entry.user?.userPhoto || "/default-avatar.png",
         position: index + 1,
-        // 🔥 CRUCIAL : Prendre userId soit de l'entrée, soit du user associé
+        //  Prendre userId soit de l'entrée, soit du user associé
         userId: entry.userId || entry.user?.id || null,
       };
 

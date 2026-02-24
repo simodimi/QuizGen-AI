@@ -30,17 +30,17 @@ const setupQuizSocketHandlers = (io) => {
 
     socket.on("join_user_room", (userId) => {
       socket.join(`user_${userId}`);
-      console.log(`✅ Socket ${socket.id} rejoint user_${userId}`);
+      console.log(` Socket ${socket.id} rejoint user_${userId}`);
     });
 
     socket.on("join_quiz_room", ({ quizId }) => {
       if (quizId) {
         socket.join(`quiz_${quizId}`);
-        console.log(`🏠 Socket ${socket.id} a rejoint room quiz_${quizId}`);
+        console.log(` Socket ${socket.id} a rejoint room quiz_${quizId}`);
       }
     });
-    // ✅ VERSION ROBUSTE AVEC findOrCreate
-    socket.on("quiz:join_by_code", async ({ invitationCode }) => {
+    //
+    /*socket.on("quiz:join_by_code", async ({ invitationCode }) => {
       try {
         const quiz = await Quiz.findOne({
           where: { invitationCode, status: "waiting" },
@@ -56,7 +56,7 @@ const setupQuizSocketHandlers = (io) => {
 
         socket.join(`quiz_${quiz.id}`);
 
-        // 🔥 SOLUTION ULTIME : findOrCreate (maintenant protégé par la contrainte unique)
+        // findOrCreate (maintenant protégé par la contrainte unique)
         const [participant, created] = await QuizParticipant.findOrCreate({
           where: {
             quizId: quiz.id,
@@ -70,7 +70,7 @@ const setupQuizSocketHandlers = (io) => {
             joinedAt: new Date(),
           },
         });
-        // ✅ NOUVEAU : Partager le document avec le participant
+        //  NOUVEAU : Partager le document avec le participant
         if (quiz.documentId) {
           const SharedDocument = require("../models/SharedDocument");
           await SharedDocument.findOrCreate({
@@ -86,12 +86,10 @@ const setupQuizSocketHandlers = (io) => {
               sharedAt: new Date(),
             },
           });
-          console.log(
-            `📤 Document partagé avec le participant ${socket.userId}`,
-          );
+          console.log(` Document partagé avec le participant ${socket.userId}`);
         }
         console.log(
-          `✅ Participant ${created ? "créé" : "existait"} pour quiz ${quiz.id}`,
+          ` Participant ${created ? "créé" : "existait"} pour quiz ${quiz.id}`,
         );
 
         // Récupérer les participants (maintenant sans doublons grâce à la contrainte)
@@ -161,8 +159,155 @@ const setupQuizSocketHandlers = (io) => {
           message: "Erreur serveur",
         });
       }
+    });*/
+    socket.on("quiz:join_by_code", async ({ invitationCode }) => {
+      try {
+        // Vérifier que le quiz existe et est en attente
+        const quiz = await Quiz.findOne({
+          where: {
+            invitationCode,
+            status: "waiting",
+          },
+          include: [{ model: Document, as: "document" }],
+        });
+
+        if (!quiz) {
+          socket.emit("quiz:join_error", {
+            message:
+              "❌ Ce code n'est plus valide - La partie a déjà commencé !",
+            code: "QUIZ_STARTED",
+          });
+          return;
+        }
+
+        // Vérifier si l'utilisateur est déjà participant
+        const existingParticipant = await QuizParticipant.findOne({
+          where: {
+            quizId: quiz.id,
+            userId: socket.userId,
+          },
+        });
+
+        if (existingParticipant) {
+          socket.emit("quiz:join_error", {
+            message: "👋 Vous avez déjà rejoint ce quiz",
+            code: "ALREADY_JOINED",
+          });
+          return;
+        }
+
+        // Rejoindre la room socket
+        socket.join(`quiz_${quiz.id}`);
+
+        // Créer le participant (findOrCreate pour sécurité)
+        const [participant, created] = await QuizParticipant.findOrCreate({
+          where: {
+            quizId: quiz.id,
+            userId: socket.userId,
+          },
+          defaults: {
+            quizId: quiz.id,
+            userId: socket.userId,
+            isReady: false,
+            score: 0,
+            joinedAt: new Date(),
+          },
+        });
+
+        console.log(
+          `✅ Participant ${created ? "créé" : "existait"} pour quiz ${quiz.id}`,
+        );
+
+        // Partager le document avec le participant (si document existe)
+        if (quiz.documentId) {
+          try {
+            const SharedDocument = require("../models/SharedDocument");
+            await SharedDocument.findOrCreate({
+              where: {
+                documentId: quiz.documentId,
+                sharedWithId: socket.userId,
+              },
+              defaults: {
+                documentId: quiz.documentId,
+                ownerId: quiz.creatorId,
+                sharedWithId: socket.userId,
+                sharedViaQuizId: quiz.id,
+                sharedAt: new Date(),
+              },
+            });
+            console.log(
+              `📄 Document partagé avec le participant ${socket.userId}`,
+            );
+          } catch (docError) {
+            console.error("⚠️ Erreur partage document:", docError);
+            // On continue même si le partage échoue
+          }
+        }
+
+        // Récupérer tous les participants à jour
+        const participants = await QuizParticipant.findAll({
+          where: { quizId: quiz.id },
+          include: [
+            {
+              model: User,
+              as: "user",
+              attributes: ["iduser", "userName", "userPhoto"],
+            },
+          ],
+        });
+
+        const formattedParticipants = participants.map((p) => ({
+          userId: p.userId,
+          userName: p.user?.userName || "Inconnu",
+          userPhoto: p.user?.userPhoto || "/default-avatar.png",
+          isReady: p.isReady,
+          score: p.score || 0,
+        }));
+
+        // Émettre la mise à jour des participants à TOUS dans la room
+        io.to(`quiz_${quiz.id}`).emit("quiz:participants_update", {
+          participants: formattedParticipants,
+        });
+
+        // Envoyer les infos du quiz à l'utilisateur qui vient de rejoindre
+        socket.emit("quiz:quiz_info", {
+          quizId: quiz.id,
+          title: quiz.title,
+          creatorId: quiz.creatorId,
+          questionCount: quiz.questionCount,
+        });
+
+        // Confirmer que l'utilisateur a bien rejoint
+        socket.emit("quiz:joined", {
+          quizId: quiz.id,
+          title: quiz.title,
+          creatorId: quiz.creatorId,
+          isCreator: quiz.creatorId === socket.userId,
+        });
+
+        console.log(
+          `🎯 Utilisateur ${socket.userId} a rejoint le quiz ${quiz.id}`,
+        );
+      } catch (error) {
+        // Gestion des erreurs spécifiques
+        if (error.name === "SequelizeUniqueConstraintError") {
+          console.log("⚠️ Tentative de double inscription bloquée");
+          socket.emit("quiz:join_error", {
+            message: "Vous avez déjà rejoint ce quiz",
+            code: "DUPLICATE_ENTRY",
+          });
+          return;
+        }
+
+        // Erreur générale
+        console.error("❌ Erreur dans quiz:join_by_code:", error);
+        socket.emit("quiz:join_error", {
+          message: "Erreur serveur lors de la connexion au quiz",
+          code: "SERVER_ERROR",
+        });
+      }
     });
-    // ✅ MARQUER COMME PRÊT
+    //  MARQUER COMME PRÊT
     socket.on("quiz:player_ready", async ({ quizId }) => {
       try {
         await QuizParticipant.update(
@@ -189,7 +334,7 @@ const setupQuizSocketHandlers = (io) => {
           score: p.score || 0,
         }));
 
-        // ✅ ÉMETTRE À TOUS DANS LA ROOM
+        //  ÉMETTRE À TOUS DANS LA ROOM
         io.to(`quiz_${quizId}`).emit("quiz:player_ready", {
           userId: socket.userId,
           participants: formattedParticipants,
@@ -199,11 +344,11 @@ const setupQuizSocketHandlers = (io) => {
           participants: formattedParticipants,
         });
       } catch (error) {
-        console.error("❌ Erreur quiz:player_ready:", error);
+        console.error(" Erreur quiz:player_ready:", error);
       }
     });
 
-    // ✅ DÉMARRER LE QUIZ
+    //  DÉMARRER LE QUIZ
     socket.on("quiz:multi_start", async ({ quizId }) => {
       try {
         const quiz = await Quiz.findByPk(quizId, {
@@ -223,7 +368,7 @@ const setupQuizSocketHandlers = (io) => {
           return;
         }
 
-        // ✅ S'assurer que le créateur est dans la room
+        //  S'assurer que le créateur est dans la room
         socket.join(`quiz_${quizId}`);
 
         const readyCount = await QuizParticipant.count({
@@ -262,7 +407,7 @@ const setupQuizSocketHandlers = (io) => {
           startTime: Date.now(),
         });
 
-        // ✅ PREMIÈRE QUESTION - ENVOYER À TOUTE LA ROOM
+        //  PREMIÈRE QUESTION - ENVOYER À TOUTE LA ROOM
         const firstQuestion = questions[0];
         const questionForClients = {
           id: firstQuestion.id,
@@ -289,13 +434,13 @@ const setupQuizSocketHandlers = (io) => {
           firstQuestion.timeLimit,
         );
 
-        console.log(`🎮 Quiz ${quizId} démarré - Question 1 envoyée`);
+        console.log(` Quiz ${quizId} démarré - Question 1 envoyée`);
       } catch (error) {
-        console.error("❌ Erreur quiz:multi_start:", error);
+        console.error(" Erreur quiz:multi_start:", error);
       }
     });
 
-    // ✅ SOUMETTRE UNE RÉPONSE
+    //  SOUMETTRE UNE RÉPONSE
     socket.on("quiz:multi_answer", async ({ quizId, questionId, answer }) => {
       try {
         const quizState = activeQuizzes.get(quizId);
@@ -357,7 +502,7 @@ const setupQuizSocketHandlers = (io) => {
           answeredAt: new Date(),
         });
 
-        // ✅ Récupérer tous les participants avec leurs scores
+        //  Récupérer tous les participants avec leurs scores
         const allParticipants = await QuizParticipant.findAll({
           where: { quizId },
           include: [
@@ -377,7 +522,7 @@ const setupQuizSocketHandlers = (io) => {
           score: p.score || 0,
         }));
 
-        // ✅ ENVOYER LE RÉSULTAT INDIVIDUEL
+        //  ENVOYER LE RÉSULTAT INDIVIDUEL
         socket.emit("quiz:answer_result", {
           isCorrect,
           scoreEarned: score,
@@ -386,7 +531,7 @@ const setupQuizSocketHandlers = (io) => {
           explanation: currentQuestion.explanation,
         });
 
-        // ✅ ENVOYER LE CLASSEMENT À TOUS
+        //  ENVOYER LE CLASSEMENT À TOUS
         io.to(`quiz_${quizId}`).emit("quiz:leaderboard_update", {
           leaderboard,
           questionId,
@@ -396,7 +541,7 @@ const setupQuizSocketHandlers = (io) => {
       }
     });
 
-    // ✅ AFFICHER LA CORRECTION AUTOMATIQUEMENT
+    //  AFFICHER LA CORRECTION AUTOMATIQUEMENT
     socket.on("quiz:show_correction", async ({ quizId }) => {
       try {
         const quiz = await Quiz.findByPk(quizId);
@@ -436,7 +581,7 @@ const setupQuizSocketHandlers = (io) => {
           score: p.score || 0,
         }));
 
-        // ✅ ENVOYER LA CORRECTION À TOUS
+        //  ENVOYER LA CORRECTION À TOUS
         io.to(`quiz_${quizId}`).emit("quiz:show_correction", {
           questionId: currentQuestion.id,
           correctAnswer: currentQuestion.correctAnswer,
@@ -444,13 +589,13 @@ const setupQuizSocketHandlers = (io) => {
           leaderboard,
         });
 
-        console.log(`📢 Correction affichée pour quiz ${quizId}`);
+        console.log(` Correction affichée pour quiz ${quizId}`);
       } catch (error) {
-        console.error("❌ Erreur quiz:show_correction:", error);
+        console.error(" Erreur quiz:show_correction:", error);
       }
     });
 
-    // ✅ PASSER À LA QUESTION SUIVANTE
+    //  PASSER À LA QUESTION SUIVANTE
     socket.on("quiz:next_question", async ({ quizId }) => {
       try {
         const quiz = await Quiz.findByPk(quizId);
@@ -475,7 +620,7 @@ const setupQuizSocketHandlers = (io) => {
           return;
         }
 
-        // ✅ PROCHAINE QUESTION
+        //  PROCHAINE QUESTION
         const nextQuestion =
           quizState.questions[quizState.currentQuestionIndex];
         const questionForClients = {
@@ -488,7 +633,7 @@ const setupQuizSocketHandlers = (io) => {
           order: nextQuestion.order,
         };
 
-        // ✅ ENVOYER À TOUS
+        //  ENVOYER À TOUS
         io.to(`quiz_${quizId}`).emit("quiz:question_start", {
           question: questionForClients,
           questionNumber: quizState.currentQuestionIndex + 1,
@@ -500,17 +645,15 @@ const setupQuizSocketHandlers = (io) => {
         startQuestionTimer(io, quizId, nextQuestion.id, nextQuestion.timeLimit);
 
         console.log(
-          `⏩ Quiz ${quizId} - Question ${quizState.currentQuestionIndex + 1}`,
+          ` Quiz ${quizId} - Question ${quizState.currentQuestionIndex + 1}`,
         );
       } catch (error) {
-        console.error("❌ Erreur quiz:next_question:", error);
+        console.error(" Erreur quiz:next_question:", error);
       }
     });
 
     socket.on("disconnect", () => {
-      console.log(
-        `🔌 Socket déconnecté: ${socket.id} (User: ${socket.userId})`,
-      );
+      console.log(` Socket déconnecté: ${socket.id} (User: ${socket.userId})`);
     });
     socket.on("quiz:confirm_generation", async ({ quizId }) => {
       try {
@@ -524,13 +667,13 @@ const setupQuizSocketHandlers = (io) => {
           });
         }
       } catch (error) {
-        console.error("❌ Erreur confirmation génération:", error);
+        console.error(" Erreur confirmation génération:", error);
       }
     });
   });
 };
 
-// ✅ ÉVALUER LES RÉPONSES MANQUANTES
+//  ÉVALUER LES RÉPONSES MANQUANTES
 async function evaluateMissingAnswers(io, quizId, quizState) {
   try {
     const question = quizState.questions[quizState.currentQuestionIndex];
@@ -561,7 +704,7 @@ async function evaluateMissingAnswers(io, quizId, quizState) {
       }
     }
   } catch (error) {
-    console.error("❌ Erreur evaluateMissingAnswers:", error);
+    console.error(" Erreur evaluateMissingAnswers:", error);
   }
 }
 
@@ -576,8 +719,6 @@ function startQuestionTimer(io, quizId, questionId, duration) {
       questionId,
       message: "⏰ Temps écoulé !",
     });
-
-    // ✅ AJOUT: Déclencher automatiquement la correction
     // Récupérer le quiz pour vérifier le créateur
     const quiz = await Quiz.findByPk(quizId);
 
@@ -609,7 +750,7 @@ function startQuestionTimer(io, quizId, questionId, duration) {
         score: p.score || 0,
       }));
 
-      // ✅ ENVOYER LA CORRECTION À TOUS AUTOMATIQUEMENT
+      //  ENVOYER LA CORRECTION À TOUS AUTOMATIQUEMENT
       io.to(`quiz_${quizId}`).emit("quiz:show_correction", {
         questionId: currentQuestion.id,
         correctAnswer: currentQuestion.correctAnswer,
@@ -618,11 +759,9 @@ function startQuestionTimer(io, quizId, questionId, duration) {
         autoTriggered: true, // Indiquer que c'est automatique
       });
 
-      console.log(
-        `📢 Correction automatique pour quiz ${quizId} (temps écoulé)`,
-      );
+      console.log(` Correction automatique pour quiz ${quizId} (temps écoulé)`);
     } catch (error) {
-      console.error("❌ Erreur correction automatique:", error);
+      console.error(" Erreur correction automatique:", error);
     }
   }, duration * 1000);
 }
@@ -646,7 +785,7 @@ async function endQuiz(io, quizId, quizState) {
       order: [["score", "DESC"]],
     });
 
-    // ✅ AJOUT CRITIQUE - Sauvegarder les positions et les résultats
+    //  AJOUT CRITIQUE - Sauvegarder les positions et les résultats
     for (let i = 0; i < participants.length; i++) {
       const participant = participants[i];
       const position = i + 1;
@@ -655,7 +794,7 @@ async function endQuiz(io, quizId, quizState) {
       participant.position = position;
       await participant.save();
 
-      // ✅ SAUVEGARDER DANS UserProgress
+      //  SAUVEGARDER DANS UserProgress
       try {
         // Calculer le pourcentage
         const percentage =
@@ -681,11 +820,11 @@ async function endQuiz(io, quizId, quizState) {
         await updateGlobalStats(participant.userId, participant.score);
 
         console.log(
-          `✅ Historique sauvegardé pour user ${participant.userId}: ${participant.score}/${quiz.questionCount} (position ${position})`,
+          ` Historique sauvegardé pour user ${participant.userId}: ${participant.score}/${quiz.questionCount} (position ${position})`,
         );
       } catch (progressError) {
         console.error(
-          `❌ Erreur sauvegarde UserProgress pour user ${participant.userId}:`,
+          ` Erreur sauvegarde UserProgress pour user ${participant.userId}:`,
           progressError,
         );
       }
@@ -699,7 +838,7 @@ async function endQuiz(io, quizId, quizState) {
       score: p.score,
     }));
 
-    // ✅ ENVOYER À TOUS
+    // ENVOYER À TOUS
     io.to(`quiz_${quizId}`).emit("quiz:ended", {
       quizId,
       leaderboard,
@@ -715,7 +854,7 @@ async function endQuiz(io, quizId, quizState) {
   }
 }
 
-// ✅ AJOUTER cette fonction helper à la fin du fichier
+//  AJOUTER cette fonction helper à la fin du fichier
 async function updateGlobalStats(userId, score) {
   try {
     let globalStats = await UserProgress.findOne({

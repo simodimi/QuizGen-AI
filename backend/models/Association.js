@@ -1,4 +1,4 @@
-const { sequelize } = require("../config/database"); //sequelize = require("../config/database");
+const { sequelize } = require("../config/database");
 const { DataTypes } = require("sequelize");
 // Import des modèles
 const User = require("./User");
@@ -15,7 +15,7 @@ const SharedDocument = require("./SharedDocument");
 
 // Associations
 
-// User -> Document (1:N)
+// User - Document (1:N)
 User.hasMany(Document, {
   foreignKey: "userId", //user devient cle etrangere de la table document
   as: "documents",
@@ -26,7 +26,7 @@ Document.belongsTo(User, {
   as: "owner",
 });
 
-// Document -> Section (1:N)
+// Document - Section (1:N)
 Document.hasMany(Section, {
   foreignKey: "documentId",
   as: "sections",
@@ -37,7 +37,7 @@ Section.belongsTo(Document, {
   as: "document",
 });
 
-// Document -> Quiz (1:N)
+// Document - Quiz (1:N)
 Document.hasMany(Quiz, {
   foreignKey: "documentId",
   as: "quizzes",
@@ -48,7 +48,7 @@ Quiz.belongsTo(Document, {
   as: "document",
 });
 
-// User -> Quiz (créateur) (1:N)
+// User - Quiz (créateur) (1:N)
 User.hasMany(Quiz, {
   foreignKey: "creatorId",
   as: "createdQuizzes",
@@ -59,7 +59,7 @@ Quiz.belongsTo(User, {
   as: "creator",
 });
 
-// Quiz -> Question (1:N)
+// Quiz - Question (1:N)
 Quiz.hasMany(Question, {
   foreignKey: "quizId",
   as: "questions",
@@ -70,7 +70,7 @@ Question.belongsTo(Quiz, {
   as: "quiz",
 });
 
-// Quiz -> QuizParticipant (1:N)
+// Quiz - QuizParticipant (1:N)
 Quiz.hasMany(QuizParticipant, {
   foreignKey: "quizId",
   as: "participants",
@@ -81,7 +81,7 @@ QuizParticipant.belongsTo(Quiz, {
   as: "quiz",
 });
 
-// User -> QuizParticipant (1:N)
+// User - QuizParticipant (1:N)
 User.hasMany(QuizParticipant, {
   foreignKey: "userId",
   as: "quizParticipations",
@@ -92,7 +92,7 @@ QuizParticipant.belongsTo(User, {
   as: "user",
 });
 
-// Question -> QuizAnswer (1:N)
+// Question - QuizAnswer (1:N)
 Question.hasMany(QuizAnswer, {
   foreignKey: "questionId",
   as: "answers",
@@ -103,7 +103,7 @@ QuizAnswer.belongsTo(Question, {
   as: "question",
 });
 
-// User -> QuizAnswer (1:N)
+// User - QuizAnswer (1:N)
 User.hasMany(QuizAnswer, {
   foreignKey: "userId",
   as: "quizAnswers",
@@ -114,7 +114,7 @@ QuizAnswer.belongsTo(User, {
   as: "user",
 });
 
-// Quiz -> QuizAnswer (1:N)
+// Quiz - QuizAnswer (1:N)
 Quiz.hasMany(QuizAnswer, {
   foreignKey: "quizId",
   as: "quizAnswers",
@@ -125,7 +125,7 @@ QuizAnswer.belongsTo(Quiz, {
   as: "quiz",
 });
 
-// User -> Friend (relations symétriques)
+// User - Friend (relations symétriques)
 User.belongsToMany(User, {
   through: Friend,
   as: "friends",
@@ -143,7 +143,7 @@ Friend.belongsTo(User, {
   as: "addressee",
 });
 
-// User -> Message (sent) (1:N)
+// User - Message (sent) (1:N)
 User.hasMany(Message, {
   foreignKey: "senderId",
   as: "sentMessages",
@@ -154,7 +154,7 @@ Message.belongsTo(User, {
   as: "sender",
 });
 
-// User -> Message (received) (1:N)
+// User - Message (received) (1:N)
 User.hasMany(Message, {
   foreignKey: "receiverId",
   as: "receivedMessages",
@@ -165,7 +165,7 @@ Message.belongsTo(User, {
   as: "addressee",
 });
 
-// Message -> Message (reply) (auto-référence)
+// Message - Message (reply) (auto-référence)
 Message.belongsTo(Message, {
   foreignKey: "replyToId",
   as: "replyTo",
@@ -175,7 +175,7 @@ Message.hasMany(Message, {
   as: "replies",
 });
 
-// User -> UserProgress (1:n)
+// User - UserProgress (1:n)
 User.hasMany(UserProgress, {
   foreignKey: "userId",
   as: "progressHistory",
@@ -186,7 +186,7 @@ UserProgress.belongsTo(User, {
   as: "user",
 });
 
-// Quiz -> UserProgress (via QuizAnswer)
+// Quiz - UserProgress (via QuizAnswer)
 Quiz.hasMany(UserProgress, {
   foreignKey: "quizId",
   as: "userProgresses",

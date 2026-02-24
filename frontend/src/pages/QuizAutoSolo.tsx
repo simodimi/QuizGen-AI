@@ -75,15 +75,14 @@ const QuizAutoSolo = () => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const socketInitialized = useRef<boolean>(false); // ← AJOUTER
 
-  // SOLUTION: Même pattern que QuizAutoMulti
   useEffect(() => {
     if (!user?.id) return;
     if (socketInitialized.current) {
-      console.log("⚠️ Socket déjà initialisé, on ignore");
+      console.log("Socket déjà initialisé, on ignore");
       return;
     }
 
-    console.log("🔄 Initialisation du socket pour QuizAutoSolo");
+    console.log("Initialisation du socket pour QuizAutoSolo");
     socketInitialized.current = true;
 
     const newSocket = io("http://localhost:5000", {
@@ -99,131 +98,108 @@ const QuizAutoSolo = () => {
       newSocket.emit("join_user_room", user.id);
     });
 
-    const handleProgress = (data: {
-      step: number;
-      message: string;
-      progress: number;
-    }) => {
+    // 📌 GESTION DE LA PROGRESSION
+    newSocket.on("quiz:generation_progress", (data) => {
       console.log("📊 Progression reçue:", data);
       setProgressStep(data.step);
       setProgressMessage(data.message);
       setProgress(data.progress);
-
       const elapsed = Math.round((Date.now() - startTime) / 1000);
       setGenerationTime(elapsed);
-    };
+    });
 
-    const handleError = (data: { message: string }) => {
+    // 📌 GESTION DE LA FIN DE GÉNÉRATION - AJOUTÉ ICI !
+    newSocket.on("quiz:generation_complete", async (data) => {
+      console.log("🎉 ÉVÉNEMENT REÇU - generation_complete:", data);
+
+      if (data.quizId) {
+        try {
+          console.log(`📥 Récupération du quiz ${data.quizId}...`);
+          const quizResponse = await connect.get(`/api/quizzes/${data.quizId}`);
+          setQuizData(quizResponse.data.quiz);
+
+          // ✅ SOLUTION 1 : Désactiver le chargement
+          setIsLoading(false); // <-- AJOUTEZ CETTE LIGNE
+
+          await connect.post(`/api/quizzes/${data.quizId}/start`);
+
+          setMessage(`C'est parti ${user?.userName}! 🤖`);
+          setShowProfilMessage(true);
+          setTimeout(() => setShowProfilMessage(false), 3000);
+        } catch (error) {
+          console.error("❌ Erreur récupération quiz:", error);
+          setError("Erreur lors du chargement du quiz");
+          setIsLoading(false); // <-- AUSSI EN CAS D'ERREUR
+        }
+      }
+    });
+
+    // 📌 GESTION DES ERREURS
+    newSocket.on("quiz:generation_error", (data) => {
       console.error("❌ Erreur socket:", data);
-      setProgressMessage(`❌ ${data.message}`);
-    };
+      setError(data.message || "Erreur lors de la génération");
+    });
 
-    const handleDisconnect = () => {
-      console.log("🔌 Socket déconnecté");
+    newSocket.on("disconnect", () => {
+      console.log("Socket déconnecté");
       setIsConnected(false);
-    };
-
-    newSocket.on("quiz:generation_progress", handleProgress);
-    newSocket.on("quiz:generation_error", handleError);
-    newSocket.on("disconnect", handleDisconnect);
+    });
 
     return () => {
       console.log("🧹 Nettoyage du socket");
       newSocket.off("connect");
-      newSocket.off("quiz:generation_progress", handleProgress);
-      newSocket.off("quiz:generation_error", handleError);
-      newSocket.off("disconnect", handleDisconnect);
+      newSocket.off("quiz:generation_progress");
+      newSocket.off("quiz:generation_complete");
+      newSocket.off("quiz:generation_error");
+      newSocket.off("disconnect");
       newSocket.disconnect();
       socketInitialized.current = false;
     };
-  }, [user?.id, startTime]);
-  // Sélectionner un avatar aléatoire
-  useEffect(() => {
-    const picture = Avatar[Math.floor(Math.random() * Avatar.length)];
-    setAvatar(picture?.avatar || a1);
-  }, []);
+  }, [user?.id, startTime, quizData]); // Dépendances
 
-  // SOLUTION: useCallback avec dépendances stables ET ref pour éviter les doublons
   const generateQuizFromDocument = useCallback(async () => {
-    // Éviter les appels multiples
     if (hasGenerated.current) return;
-
     if (!documentId) {
-      setError(
-        "Aucun document sélectionné. Veuillez d'abord uploader un document.",
-      );
+      setError("Aucun document sélectionné.");
       setIsLoading(false);
       return;
     }
 
     try {
       setIsLoading(true);
-      hasGenerated.current = true; // 🔥 Marquer comme généré immédiatement
+      hasGenerated.current = true;
+      console.log(`🎯 Génération quiz document ${documentId}`);
 
-      console.log(`📄 Génération du quiz pour le document ${documentId}`);
+      // SEULEMENT LANCER LA GÉNÉRATION - RIEN D'AUTRE
+      const response = await connect.post(`/api/quizzes/ai/${documentId}`, {
+        mode: "solo",
+        difficulty: "medium",
+      });
 
-      // Appel API avec timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 2 minutes timeout
-
-      const response = await connect.post(
-        `/api/quizzes/ai/${documentId}`,
-        {
-          mode: "solo",
-          difficulty: "medium",
-        },
-        { signal: controller.signal },
-      );
-
-      clearTimeout(timeoutId);
-
-      if (response.data.success) {
-        const quizId = response.data.quizId;
-        console.log(`✅ Quiz généré avec succès: ${quizId}`);
-
-        // Récupérer les détails du quiz
-        const quizResponse = await connect.get(`/api/quizzes/${quizId}`);
-        setQuizData(quizResponse.data.quiz);
-
-        // Démarrer le quiz
-        await connect.post(`/api/quizzes/${quizId}/start`);
-
-        setMessage(
-          `Hello ${user?.userName}, c'est parti pour le quiz "${fileName || "IA"}"! 🤖`,
-        );
-        setShowProfilMessage(true);
-        setTimeout(() => setShowProfilMessage(false), 3000);
+      if (!response.data.success) {
+        throw new Error("Échec de la génération");
       }
+
+      console.log(`✅ Quiz ID reçu: ${response.data.quizId}`);
+      // ✅ LE SOCKET (déjà dans le useEffect) S'OCCUPE DU RESTE
     } catch (error: any) {
-      console.error("❌ Erreur lors de la génération du quiz:", error);
-
-      if (error.name === "AbortError" || error.code === "ECONNABORTED") {
-        setError(
-          "Le serveur met trop de temps à répondre. Veuillez réessayer.",
-        );
-      } else if (error.response?.status === 400) {
-        setError(
-          error.response.data.message ||
-            "Document incompatible pour générer un quiz.",
-        );
-      } else if (error.response?.status === 404) {
-        setError("Document non trouvé. Veuillez réessayer.");
-      } else {
-        setError("Erreur lors de la génération du quiz. Veuillez réessayer.");
-      }
-
-      // Réinitialiser le flag pour permettre une nouvelle tentative
+      console.error("❌ Erreur:", error);
+      setError(error.message || "Erreur lors de la génération");
       hasGenerated.current = false;
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // ← Seulement en cas d'erreur
     }
-  }, [documentId, fileName, user?.userName]); // Dépendances stables
-
-  // 🔥 SOLUTION: useEffect avec une seule exécution
+    // ⚠️ PAS DE finally avec setIsLoading(false) ici !
+  }, [documentId]); // ← Enlève user?.userName et socket des dépendances
+  // useEffect avec une seule exécution
   useEffect(() => {
     generateQuizFromDocument();
   }, [generateQuizFromDocument]); // Dépendance unique et stable
 
+  // Sélectionner un avatar aléatoire
+  useEffect(() => {
+    const picture = Avatar[Math.floor(Math.random() * Avatar.length)];
+    setAvatar(picture?.avatar || a1);
+  }, []);
   const playSound = (src: string) => {
     const audio = new Audio(src);
     audio.play();
@@ -621,31 +597,6 @@ const QuizAutoSolo = () => {
     );
   }
 
-  /* if (isLoading) {
-    return (
-      <div className="QuizHeader">
-        <div className="QuizHeaderBtn">
-          <Button
-            className="retour"
-            onClick={() => navigate("/home/quiz/autoIA")}
-          >
-            Retour
-          </Button>
-        </div>
-        <div className="LoadingQuiz">
-          <img src={a1} alt="Chargement" />
-          <h1>L'IA génère votre quiz... ⚡</h1>
-          <p>
-            Analyse du document "{fileName || "..."}" en cours, patientez
-            quelques instants.
-          </p>
-          <p className="text-sm text-gray-500 mt-4">
-            Cela peut prendre jusqu'à 30 secondes
-          </p>
-        </div>
-      </div>
-    );
-  }*/
   // Composant pour les étapes
   const StepItem = ({
     step,
@@ -714,7 +665,7 @@ const QuizAutoSolo = () => {
           <h1>Génération du quiz en cours... ⚡</h1>
           <p>Document : "{fileName || "..."}"</p>
 
-          {/* 🔥 BARRE DE PROGRESSION DYNAMIQUE */}
+          {/* BARRE DE PROGRESSION DYNAMIQUE */}
           <div
             className="progress-container"
             style={{ width: "80%", margin: "20px auto" }}
@@ -753,7 +704,7 @@ const QuizAutoSolo = () => {
             </div>
           </div>
 
-          {/* 🔥 MESSAGE DE PROGRESSION */}
+          {/* MESSAGE DE PROGRESSION */}
           <p
             className="progress-message"
             style={{
@@ -766,7 +717,7 @@ const QuizAutoSolo = () => {
             {progressMessage}
           </p>
 
-          {/* 🔥 TEMPS ÉCOULÉ */}
+          {/* TEMPS ÉCOULÉ */}
           <p
             className="elapsed-time"
             style={{ color: "#999", marginBottom: "20px" }}
@@ -775,7 +726,7 @@ const QuizAutoSolo = () => {
             {(generationTime % 60).toString().padStart(2, "0")}
           </p>
 
-          {/* 🔥 ÉTAPES DÉTAILLÉES */}
+          {/* ÉTAPES DÉTAILLÉES */}
           <div
             className="loading-steps"
             style={{
@@ -808,7 +759,7 @@ const QuizAutoSolo = () => {
             <StepItem
               step={4}
               currentStep={progressStep}
-              title="Génération IA (la plus longue)"
+              title="Génération IA"
               done={progress > 60}
             />
             <StepItem

@@ -1,6 +1,4 @@
 import { useState, type ChangeEvent, useRef, useEffect } from "react";
-import { io, Socket } from "socket.io-client";
-
 import "../style/ami.css";
 import Emoji from "../components/layout/Emoji";
 import logo from "../assets/icone/logo.png";
@@ -40,7 +38,6 @@ interface AmiProps {
 }
 
 const Message = ({ usersend }: AmiProps) => {
-  const [open, setopen] = useState<boolean>(false);
   const [write, setwrite] = useState<string>("");
   const [showemoji, setshowemoji] = useState<boolean>(false);
   const [userSms, setuserSms] = useState<Record<string, Message[]>>({});
@@ -58,16 +55,14 @@ const Message = ({ usersend }: AmiProps) => {
   const { user } = useAuth();
   const currentMessages = selectUser !== null ? userSms[selectUser] || [] : [];
   const navigate = useNavigate();
-  const { socket, onlineUsers, typingUsers } = useSocket();
+  const { socket, onlineUsers, typingUsers, unreadCounts } = useSocket();
 
   // Initialisation Socket.IO
   useEffect(() => {
     if (!socket) return;
 
-    const newSocket = socket;
     // Écouter les nouveaux messages
-    newSocket.on("chat:receive", (newMessage: any) => {
-      // 🔥 IGNORER les messages envoyés par moi-même
+    socket.on("chat:receive", (newMessage: any) => {
       if (newMessage.senderId === user?.id) return;
 
       const conversationId = newMessage.senderId;
@@ -90,57 +85,36 @@ const Message = ({ usersend }: AmiProps) => {
         ...prev,
         [conversationId]: [...(prev[conversationId] || []), formattedMessage],
       }));
+
+      // Si on est dans la conversation, marquer comme lu
+      if (selectUser === conversationId) {
+        markMessageAsRead(conversationId);
+      }
     });
 
-    // Indicateur de frappe
-    /*newSocket.on("chat:conversation_read", ({ messageIds }) => {
-      setuserSms((prev) => {
-        const updated = { ...prev };
-
-        Object.keys(updated).forEach((convId) => {
-          updated[convId] = updated[convId].map((msg) =>
-            messageIds?.includes(msg.id) ? { ...msg, isRead: true } : msg,
-          );
-        });
-
-        return updated;
-      });
-    });*/
+    // Quand l'autre utilisateur lit mes messages
     socket.on("chat:messages_read", ({ readerId, messageIds }) => {
-      console.log("Messages lus reçus:", { readerId, messageIds });
+      console.log("Messages lus par l'autre:", { readerId, messageIds });
 
-      setuserSms((prev) => {
-        const updated = { ...prev };
-
-        // Mettre à jour tous les messages concernés
-        Object.keys(updated).forEach((convId) => {
-          updated[convId] = updated[convId].map((msg) => {
-            if (messageIds?.includes(msg.id)) {
-              return { ...msg, isRead: true };
-            }
-            return msg;
+      if (readerId !== user?.id) {
+        setuserSms((prev) => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach((convId) => {
+            updated[convId] = updated[convId].map((msg) => {
+              if (msg.senderId === user?.id && msg.receiverId === readerId) {
+                return { ...msg, isRead: true };
+              }
+              return msg;
+            });
           });
+          return updated;
         });
-
-        return updated;
-      });
-    });
-
-    // Écouter la confirmation de lecture de conversation
-    socket.on("chat:conversation_read_success", ({ otherUserId }) => {
-      console.log("Conversation lue:", otherUserId);
-      // Recharger les messages ou mettre à jour localement
-      if (selectUser === otherUserId) {
-        loadsms(otherUserId);
       }
     });
 
     // Notifications
-    newSocket.on("chat:notification", (notification: any) => {
-      console.log("Notification reçue:", notification);
-
+    socket.on("chat:notification", (notification: any) => {
       if (notification.senderId !== selectUser) {
-        // Afficher une notification
         if ("Notification" in window && Notification.permission === "granted") {
           new Notification(`Nouveau message de ${notification.senderName}`, {
             body: notification.preview,
@@ -151,7 +125,7 @@ const Message = ({ usersend }: AmiProps) => {
     });
 
     // Gestion des erreurs
-    newSocket.on("connect_error", (error) => {
+    socket.on("connect_error", (error) => {
       console.error("Erreur de connexion Socket.IO:", error);
     });
 
@@ -161,14 +135,12 @@ const Message = ({ usersend }: AmiProps) => {
     }
 
     return () => {
-      console.log("Nettoyage Socket.IO");
+      console.log("Nettoyage Socket.IO dans Message");
       if (typingTimeout) {
         clearTimeout(typingTimeout);
       }
       socket.off("chat:receive");
-      socket.off("chat:sent");
       socket.off("chat:messages_read");
-      socket.off("chat:conversation_read_success");
       socket.off("chat:notification");
       socket.off("connect_error");
     };
@@ -177,9 +149,6 @@ const Message = ({ usersend }: AmiProps) => {
   // Mettre à jour quand selectUser change
   useEffect(() => {
     if (socket && selectUser && user?.id) {
-      // Rejoindre la room de l'utilisateur sélectionné
-      socket.emit("join_user_room", selectUser);
-
       // Marquer les messages comme lus
       markMessageAsRead(selectUser);
     }
@@ -190,7 +159,6 @@ const Message = ({ usersend }: AmiProps) => {
     try {
       console.log("Marquage des messages comme lus pour:", senderId);
 
-      // Appel API
       const response = await connect.post(`/api/messages/${senderId}/read`);
       console.log("Réponse markAsRead:", response.data);
 
@@ -202,17 +170,15 @@ const Message = ({ usersend }: AmiProps) => {
 
           updated[senderId] = conversationMessages.map((msg) => ({
             ...msg,
-            isRead: true, // Forcer isRead à true
+            isRead: true,
           }));
 
           return updated;
         });
 
-        // Émettre via socket
         if (socket) {
-          socket.emit("chat:conversation_read", {
-            senderId,
-            readerId: user?.id,
+          socket.emit("chat:read_conversation", {
+            otherUserId: senderId,
           });
         }
       }
@@ -220,16 +186,6 @@ const Message = ({ usersend }: AmiProps) => {
       console.error("Erreur markAsRead:", error);
     }
   };
-  /*const markMessageAsRead = async (senderId: number) => {
-    try {
-      await connect.post(`/api/messages/${senderId}/read`);
-      if (socket) {
-        socket.emit("chat:conversation_read", { senderId });
-      }
-    } catch (error) {
-      console.error("Erreur lors du marquage comme lu:", error);
-    }
-  };*/
 
   // Chargement des messages
   const loadsms = async (id: number) => {
@@ -253,13 +209,18 @@ const Message = ({ usersend }: AmiProps) => {
           isEmojiOnly: isEmojiOnly(p.content),
         }));
 
-        setuserSms((prev) => ({
-          ...prev,
-          [id]: messages,
-        }));
+        setuserSms((prev) => {
+          const updated = { ...prev };
+          updated[id] = messages;
+          return updated;
+        });
 
-        // Marquer les messages comme lus
-        await markMessageAsRead(id);
+        // Si on est dans cette conversation, marquer comme lu
+        if (selectUser === id) {
+          await markMessageAsRead(id);
+        }
+
+        return messages;
       }
     } catch (error) {
       console.error("Erreur chargement messages:", error);
@@ -272,7 +233,6 @@ const Message = ({ usersend }: AmiProps) => {
 
     // Gestion de l'indicateur de frappe
     if (socket && showUser?.id && user?.id) {
-      // Émettre que l'utilisateur est en train d'écrire au DESTINATAIRE
       socket.emit("typing:start", {
         userId: user.id,
         receiverId: showUser.id,
@@ -280,12 +240,10 @@ const Message = ({ usersend }: AmiProps) => {
 
       setIsTyping(true);
 
-      // Effacer le timeout précédent
       if (typingTimeout) {
         clearTimeout(typingTimeout);
       }
 
-      // Définir un nouveau timeout pour arrêter l'indicateur
       const newTimeout = setTimeout(() => {
         if (socket && showUser?.id && user?.id) {
           socket.emit("typing:stop", {
@@ -452,51 +410,7 @@ const Message = ({ usersend }: AmiProps) => {
     );
   };
 
-  /*const renderMessage = (text: string) => {
-    const regex = /(start\S*quiz-IA)/g;
-
-    return text.split("\n").map((line, index, array) => {
-      const parts = line.split(regex);
-
-      return (
-        <div key={index}>
-          {parts.map((part, partIndex) => {
-            if (regex.test(part)) {
-              // Le lien est déjà dans le format correct: start123quiz-IA
-              const code = part.replace("start", "").replace("quiz-IA", "");
-
-              return (
-                <span
-                  key={`${index}-${partIndex}`}
-                  className="quiz-link"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    console.log("Lien quiz cliqué:", part, "Code:", code);
-                    navigate(`/home/multi?code=${code}`);
-                    // Afficher un toast pour confirmation
-                    toast.info(`Redirection vers le quiz... Code: ${code}`);
-
-                    // Naviguer vers la page quiz multi
-                    setTimeout(() => {
-                      navigate("/home/multi");
-                    }, 500);
-                  }}
-                >
-                  {part}
-                </span>
-              );
-            }
-            return part;
-          })}
-          {index < array.length - 1 && <br />}
-        </div>
-      );
-    });
-  };*/
   const renderMessage = (text: string) => {
-    // Regex POUR CAPTURER UNIQUEMENT LE FORMAT startXXXquiz-IA
     const regex = /(start\S*quiz-IA)/g;
 
     return text.split("\n").map((line, index, array) => {
@@ -505,9 +419,7 @@ const Message = ({ usersend }: AmiProps) => {
       return (
         <div key={index}>
           {parts.map((part, partIndex) => {
-            // Vérifier si la partie correspond au format startXXXquiz-IA
             if (part && part.match(/^start.*quiz-IA$/)) {
-              // Extraire le code
               const code = part.replace("start", "").replace("quiz-IA", "");
 
               return (
@@ -517,11 +429,8 @@ const Message = ({ usersend }: AmiProps) => {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-
-                    console.log("🔗 Lien quiz cliqué:", part, "Code:", code);
+                    console.log("Lien quiz cliqué:", part, "Code:", code);
                     toast.info(`🎮 Redirection vers le quiz...`);
-
-                    // ✅ UNE SEULE NAVIGATION - directe et propre
                     navigate(`/home/multi?code=${code}`);
                   }}
                 >
@@ -536,6 +445,7 @@ const Message = ({ usersend }: AmiProps) => {
       );
     });
   };
+
   useEffect(() => {
     if (usersend && friends.length > 0) {
       const foundUser = friends.find((p) => p.id === usersend);
@@ -570,54 +480,23 @@ const Message = ({ usersend }: AmiProps) => {
     const fetchFriends = async () => {
       try {
         console.log("Chargement des amis...");
-        const res = await connect.get("/api/friends");
+        const friendsRes = await connect.get("/api/friends");
 
-        const friendsList = res.data.friends.map((f: any) => ({
+        const friendsList = friendsRes.data.friends.map((f: any) => ({
           id: f.friend.id,
           name: f.friend.userName,
           photo: f.friend.userPhoto || "",
         }));
 
-        console.log("Amis chargés:", friendsList);
         setuserfilter(friendsList);
         setfriends(friendsList);
 
-        // Charger les conversations
-        const conversationdata: Record<string, Message[]> = {};
-
-        for (const friend of friendsList) {
-          try {
-            const messagesRes = await connect.get(
-              `/api/messages/conversation/${friend.id}`,
-              { withCredentials: true },
-            );
-
-            if (messagesRes.data.success) {
-              conversationdata[friend.id] = messagesRes.data.messages.map(
-                (msg: any) => ({
-                  id: msg.id,
-                  senderId: msg.senderId,
-                  receiverId: msg.receiverId,
-                  message: msg.content,
-                  content: msg.content,
-                  time: new Date(msg.createdAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }),
-                  timestamp: new Date(msg.createdAt).getTime(),
-                  isRead: msg.isRead,
-                  isEmojiOnly: isEmojiOnly(msg.content),
-                }),
-              );
-            }
-          } catch (error) {
-            console.log(`Erreur chargement messages ${friend.id}:`, error);
-            conversationdata[friend.id] = [];
-          }
-        }
-
-        console.log("Conversations chargées:", conversationdata);
-        setuserSms(conversationdata);
+        // Initialiser userSms
+        const initialSms: Record<string, Message[]> = {};
+        friendsList.forEach((friend: Friends) => {
+          initialSms[friend.id] = [];
+        });
+        setuserSms(initialSms);
       } catch (err) {
         console.error("Erreur chargement amis:", err);
       }
@@ -629,7 +508,7 @@ const Message = ({ usersend }: AmiProps) => {
   const isUserOnline = (userId: number) => {
     return onlineUsers.includes(userId);
   };
-  // Fonction pour formater la date
+
   const formatDateSeparator = (timestamp: number) => {
     const date = new Date(timestamp);
     const today = new Date();
@@ -649,7 +528,6 @@ const Message = ({ usersend }: AmiProps) => {
     }
   };
 
-  // Fonction pour vérifier si on doit afficher un séparateur
   const shouldShowDateSeparator = (
     currentMessage: Message,
     previousMessage: Message | undefined,
@@ -661,6 +539,18 @@ const Message = ({ usersend }: AmiProps) => {
 
     return currentDate !== previousDate;
   };
+ useEffect(() => {
+  const disappear=(e: MouseEvent)=>{
+    if (refemoji.current && !refemoji.current.contains(e.target as Node)) {
+      setshowemoji(false);
+    }
+  }
+ document.addEventListener("mousedown",disappear);
+   return () => {
+     document.removeEventListener("mousedown",disappear);
+   }
+ }, [refemoji]);
+ 
   return (
     <div className="headerFriends">
       <div className="headerFriendsLeft">
@@ -677,16 +567,7 @@ const Message = ({ usersend }: AmiProps) => {
           {userfilter.length > 0 ? (
             <>
               {getSortedMessages().map((p) => {
-                const unreadCount =
-                  userSms[p.id]?.filter((msg) => {
-                    // Message non lu ET c'est l'EXPÉDITEUR (pas moi)
-                    return (
-                      !msg.isRead &&
-                      msg.senderId === p.id &&
-                      msg.receiverId === user?.id
-                    );
-                  }).length || 0;
-
+                const unreadCount = unreadCounts[p.id] || 0;
                 return (
                   <div
                     className={`FriendsMainItems ${selectUser === p.id ? "active" : ""}`}

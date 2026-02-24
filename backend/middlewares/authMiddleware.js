@@ -74,54 +74,6 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
-/*const socketAuth = (socket, next) => {
-  try {
-    console.log("🔍 Socket auth attempt:", {
-      auth: socket.handshake.auth,
-      headers: socket.handshake.headers,
-      query: socket.handshake.query,
-    });
-
-    // 1. Essayer de récupérer le token de différentes manières
-    const token =
-      socket.handshake.auth?.token ||
-      socket.handshake.auth?.Token ||
-      socket.handshake.headers?.authorization?.split(" ")[1] ||
-      socket.handshake.query?.token;
-
-    // 2. Si pas de token, essayer avec juste userId
-    if (!token) {
-      const userId =
-        socket.handshake.auth?.userId || socket.handshake.query?.userId;
-
-      if (userId) {
-        console.log(`✅ Socket auth via userId: ${userId}`);
-        socket.userId = parseInt(userId);
-        return next();
-      }
-
-      // 3. PERMETTRE SANS AUTH POUR LE MOMENT
-      console.warn("⚠️ Socket sans auth, mais autorisé pour debug");
-      socket.userId = null;
-      return next();
-    }
-
-    // 4. Si token existe, le vérifier
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    socket.userId = decoded.id;
-    console.log(`✅ Socket auth réussie pour user ${socket.userId}`);
-
-    next();
-  } catch (error) {
-    console.error("❌ Socket auth error:", error.message);
-
-    // NE PAS BLOQUER LA CONNEXION - autoriser quand même
-    console.warn("⚠️ Auth échouée mais connexion autorisée");
-    socket.userId = null;
-    next(); // ← IMPORTANT: next() sans erreur
-  }
-};*/
-
 module.exports = {
   verifyToken,
 };

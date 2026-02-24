@@ -42,6 +42,7 @@ export const useAuth = (): AuthContextType => {
 export const AuthProviderUser = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const hasFetched = useRef<boolean>(false);
 
   const navigate = useNavigate();
 
@@ -61,6 +62,9 @@ export const AuthProviderUser = ({ children }: AuthProviderProps) => {
   };
 
   useEffect(() => {
+    if (hasFetched.current) return;
+
+    hasFetched.current = true;
     fetchMe();
   }, []);
 

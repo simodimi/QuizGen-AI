@@ -5,7 +5,6 @@ import eye from "../assets/icone/ouvert.png";
 import eyeClose from "../assets/icone/fermé.png";
 import "../style/connexion.css";
 import { Link, useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
 import { useAuth } from "../services/AuthContextUser";
 
 interface axiosError {
@@ -24,7 +23,7 @@ const Login = () => {
   const [passtype, setpasstype] = useState<"password" | "text">("password");
   const [showeye, setshoweye] = useState<boolean>(false);
   const [errorsms, seterrorsms] = useState<string>("");
-  const { login, user } = useAuth();
+  const { login } = useAuth();
   const [hideerrorsms, sethideerrorsms] = useState<boolean>(false);
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

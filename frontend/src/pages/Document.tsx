@@ -10,8 +10,8 @@ import connect from "../services/Util";
 import { toast } from "react-toastify";
 interface DocumentItem {
   id: number;
-  fileName: string; // Ajout
-  mimeType: string; // Ajout
+  fileName: string;
+  mimeType: string;
   createdAt: number;
   path?: string; // Optionnel
   size?: number;
@@ -61,10 +61,10 @@ const Document = () => {
         if (res.data && Array.isArray(res.data.documents)) {
           const docs = res.data.documents.map((doc: any) => ({
             id: doc.id,
-            fileName: doc.fileName, // Ajoutez le nom
-            mimeType: doc.mimeType, // Ajoutez le type MIME
+            fileName: doc.fileName,
+            mimeType: doc.mimeType,
             createdAt: new Date(doc.createdAt).getTime(),
-            path: doc.path, // Si disponible
+            path: doc.path,
             size: doc.size,
             isShared: doc.isShared || false,
             ownership: doc.ownership || "owner",

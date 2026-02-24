@@ -3,7 +3,7 @@ const { ipKeyGenerator } = require("express-rate-limit");
 // Limitation globale pour les requêtes API
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // 100 requêtes max par IP
+  max: 400, // 400 requêtes max par IP
   message: {
     message: "Trop de requêtes depuis cette IP, veuillez réessayer plus tard",
   },
@@ -32,7 +32,7 @@ const friendRequestLimiter = rateLimit({
 
 // Limitation pour les messages
 const messageLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: 120 * 1000, // 2 minute
   max: 30, // 30 messages max par minute
   message: {
     message: "Trop de messages envoyés, veuillez ralentir",
